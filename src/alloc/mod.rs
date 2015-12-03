@@ -62,16 +62,12 @@
 #![crate_type = "rlib"]
 #![cfg_attr(stage0, staged_api)]
 #![allow(unused_attributes)]
-#![unstable(feature = "alloc",
-            reason = "this library is unlikely to be stabilized in its current \
-                      form or name",
-            issue = "27783")]
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/nightly/",
        issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
        test(no_crate_inject, attr(allow(unused_variables), deny(warnings))))]
-#![no_std]
+
 #![cfg_attr(not(stage0), needs_allocator)]
 
 #![cfg_attr(stage0, feature(rustc_attrs))]
@@ -115,31 +111,16 @@
 #[cfg(stage0)]
 extern crate alloc_system;
 
-// Allow testing this library
-
-#[cfg(test)]
-#[macro_use]
-extern crate std;
-#[cfg(test)]
-#[macro_use]
-extern crate log;
-
 // Heaps provided for low-level allocation strategies
 
-pub mod heap;
+pub use core_alloc::heap;
 
 // Primitive types using the heaps above
 
-// Need to conditionally define the mod from `boxed.rs` to avoid
-// duplicating the lang-items when building in test cfg; but also need
-// to allow code to have `use boxed::HEAP;`
-// and `use boxed::Box;` declarations.
-#[cfg(not(test))]
-pub mod boxed;
-#[cfg(test)]
-mod boxed {
+pub mod boxed {
     pub use std::boxed::{Box, HEAP};
 }
+
 #[cfg(test)]
 mod boxed_test;
 pub mod arc;
@@ -149,11 +130,9 @@ pub mod raw_vec;
 /// Common out-of-memory routine
 #[cold]
 #[inline(never)]
-#[unstable(feature = "oom", reason = "not a scrutinized interface",
-           issue = "27700")]
 pub fn oom() -> ! {
     // FIXME(#14674): This really needs to do something other than just abort
     //                here, but any printing done must be *guaranteed* to not
     //                allocate.
-    unsafe { core::intrinsics::abort() }
+    unsafe { ::core::intrinsics::abort() }
 }

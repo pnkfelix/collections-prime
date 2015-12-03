@@ -148,8 +148,6 @@
 //! }
 //! ```
 
-#![stable(feature = "rust1", since = "1.0.0")]
-
 #[cfg(not(test))]
 use boxed::Box;
 #[cfg(test)]
@@ -171,7 +169,7 @@ use core::ops::CoerceUnsized;
 use core::ptr::{self, Shared};
 use core::convert::From;
 
-use heap::deallocate;
+use super::heap::deallocate;
 
 struct RcBox<T: ?Sized> {
     strong: Cell<usize>,
@@ -184,21 +182,17 @@ struct RcBox<T: ?Sized> {
 ///
 /// See the [module level documentation](./index.html) for more details.
 #[unsafe_no_drop_flag]
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Rc<T: ?Sized> {
     // FIXME #12808: strange names to try to avoid interfering with field
     // accesses of the contained type via Deref
     _ptr: Shared<RcBox<T>>,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> !marker::Send for Rc<T> {}
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> !marker::Sync for Rc<T> {}
 
 // remove cfg after new snapshot
 #[cfg(not(stage0))]
-#[unstable(feature = "coerce_unsized", issue = "27732")]
 impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<Rc<U>> for Rc<T> {}
 
 impl<T> Rc<T> {
@@ -211,7 +205,6 @@ impl<T> Rc<T> {
     ///
     /// let five = Rc::new(5);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(value: T) -> Rc<T> {
         unsafe {
             Rc {
@@ -246,7 +239,6 @@ impl<T> Rc<T> {
     /// assert_eq!(Rc::try_unwrap(x), Err(Rc::new(4)));
     /// ```
     #[inline]
-    #[stable(feature = "rc_unique", since = "1.4.0")]
     pub fn try_unwrap(this: Self) -> Result<T, Self> {
         if Rc::would_unwrap(&this) {
             unsafe {
@@ -267,9 +259,6 @@ impl<T> Rc<T> {
     }
 
     /// Checks if `Rc::try_unwrap` would return `Ok`.
-    #[unstable(feature = "rc_would_unwrap",
-               reason = "just added for niche usecase",
-               issue = "28356")]
     pub fn would_unwrap(this: &Self) -> bool {
         Rc::strong_count(&this) == 1
     }
@@ -287,7 +276,6 @@ impl<T: ?Sized> Rc<T> {
     ///
     /// let weak_five = Rc::downgrade(&five);
     /// ```
-    #[stable(feature = "rc_weak", since = "1.4.0")]
     pub fn downgrade(this: &Self) -> Weak<T> {
         this.inc_weak();
         Weak { _ptr: this._ptr }
@@ -295,16 +283,12 @@ impl<T: ?Sized> Rc<T> {
 
     /// Get the number of weak references to this value.
     #[inline]
-    #[unstable(feature = "rc_counts", reason = "not clearly useful",
-               issue = "28356")]
     pub fn weak_count(this: &Self) -> usize {
         this.weak() - 1
     }
 
     /// Get the number of strong references to this value.
     #[inline]
-    #[unstable(feature = "rc_counts", reason = "not clearly useful",
-               issue = "28356")]
     pub fn strong_count(this: &Self) -> usize {
         this.strong()
     }
@@ -324,8 +308,6 @@ impl<T: ?Sized> Rc<T> {
     /// assert!(Rc::is_unique(&five));
     /// ```
     #[inline]
-    #[unstable(feature = "rc_counts", reason = "uniqueness has unclear meaning",
-               issue = "28356")]
     pub fn is_unique(this: &Self) -> bool {
         Rc::weak_count(this) == 0 && Rc::strong_count(this) == 1
     }
@@ -348,7 +330,6 @@ impl<T: ?Sized> Rc<T> {
     /// assert!(Rc::get_mut(&mut x).is_none());
     /// ```
     #[inline]
-    #[stable(feature = "rc_unique", since = "1.4.0")]
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
         if Rc::is_unique(this) {
             let inner = unsafe { &mut **this._ptr };
@@ -361,9 +342,6 @@ impl<T: ?Sized> Rc<T> {
 
 impl<T: Clone> Rc<T> {
     #[inline]
-    #[unstable(feature = "rc_make_unique", reason = "renamed to Rc::make_mut",
-               issue = "27718")]
-    #[rustc_deprecated(since = "1.4.0", reason = "renamed to Rc::make_mut")]
     pub fn make_unique(&mut self) -> &mut T {
         Rc::make_mut(self)
     }
@@ -393,7 +371,6 @@ impl<T: Clone> Rc<T> {
     ///
     /// ```
     #[inline]
-    #[stable(feature = "rc_unique", since = "1.4.0")]
     pub fn make_mut(this: &mut Self) -> &mut T {
         if Rc::strong_count(this) != 1 {
             // Gotta clone the data, there are other Rcs
@@ -420,7 +397,6 @@ impl<T: Clone> Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Deref for Rc<T> {
     type Target = T;
 
@@ -430,7 +406,6 @@ impl<T: ?Sized> Deref for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Drop for Rc<T> {
     /// Drops the `Rc<T>`.
     ///
@@ -481,7 +456,6 @@ impl<T: ?Sized> Drop for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Clone for Rc<T> {
     /// Makes a clone of the `Rc<T>`.
     ///
@@ -504,7 +478,6 @@ impl<T: ?Sized> Clone for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: Default> Default for Rc<T> {
     /// Creates a new `Rc<T>`, with the `Default` value for `T`.
     ///
@@ -521,7 +494,6 @@ impl<T: Default> Default for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + PartialEq> PartialEq for Rc<T> {
     /// Equality for two `Rc<T>`s.
     ///
@@ -560,10 +532,8 @@ impl<T: ?Sized + PartialEq> PartialEq for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + Eq> Eq for Rc<T> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + PartialOrd> PartialOrd for Rc<T> {
     /// Partial comparison for two `Rc<T>`s.
     ///
@@ -656,7 +626,6 @@ impl<T: ?Sized + PartialOrd> PartialOrd for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + Ord> Ord for Rc<T> {
     /// Comparison for two `Rc<T>`s.
     ///
@@ -677,35 +646,30 @@ impl<T: ?Sized + Ord> Ord for Rc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + Hash> Hash for Rc<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         (**self).hash(state);
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + fmt::Display> fmt::Display for Rc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + fmt::Debug> fmt::Debug for Rc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&**self, f)
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> fmt::Pointer for Rc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&*self._ptr, f)
     }
 }
 
-#[stable(feature = "from_for_ptrs", since = "1.6.0")]
 impl<T> From<T> for Rc<T> {
     fn from(t: T) -> Self {
         Rc::new(t)
@@ -719,21 +683,17 @@ impl<T> From<T> for Rc<T> {
 ///
 /// See the [module level documentation](./index.html) for more.
 #[unsafe_no_drop_flag]
-#[stable(feature = "rc_weak", since = "1.4.0")]
 pub struct Weak<T: ?Sized> {
     // FIXME #12808: strange names to try to avoid interfering with
     // field accesses of the contained type via Deref
     _ptr: Shared<RcBox<T>>,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> !marker::Send for Weak<T> {}
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> !marker::Sync for Weak<T> {}
 
 // remove cfg after new snapshot
 #[cfg(not(stage0))]
-#[unstable(feature = "coerce_unsized", issue = "27732")]
 impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<Weak<U>> for Weak<T> {}
 
 impl<T: ?Sized> Weak<T> {
@@ -755,7 +715,6 @@ impl<T: ?Sized> Weak<T> {
     ///
     /// let strong_five: Option<Rc<_>> = weak_five.upgrade();
     /// ```
-    #[stable(feature = "rc_weak", since = "1.4.0")]
     pub fn upgrade(&self) -> Option<Rc<T>> {
         if self.strong() == 0 {
             None
@@ -766,7 +725,6 @@ impl<T: ?Sized> Weak<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Drop for Weak<T> {
     /// Drops the `Weak<T>`.
     ///
@@ -809,7 +767,6 @@ impl<T: ?Sized> Drop for Weak<T> {
     }
 }
 
-#[stable(feature = "rc_weak", since = "1.4.0")]
 impl<T: ?Sized> Clone for Weak<T> {
     /// Makes a clone of the `Weak<T>`.
     ///
@@ -831,7 +788,6 @@ impl<T: ?Sized> Clone for Weak<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + fmt::Debug> fmt::Debug for Weak<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(Weak)")
@@ -1132,14 +1088,12 @@ mod tests {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> borrow::Borrow<T> for Rc<T> {
     fn borrow(&self) -> &T {
         &**self
     }
 }
 
-#[stable(since = "1.5.0", feature = "smart_ptr_as_ref")]
 impl<T: ?Sized> AsRef<T> for Rc<T> {
     fn as_ref(&self) -> &T {
         &**self

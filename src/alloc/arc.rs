@@ -8,8 +8,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![stable(feature = "rust1", since = "1.0.0")]
-
 //! Threadsafe reference-counted boxes (the `Arc<T>` type).
 //!
 //! The `Arc<T>` type provides shared ownership of an immutable value.
@@ -88,7 +86,7 @@ use core::marker::Unsize;
 use core::hash::{Hash, Hasher};
 use core::{usize, isize};
 use core::convert::From;
-use heap::deallocate;
+use super::heap::deallocate;
 
 const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 
@@ -123,21 +121,17 @@ const MAX_REFCOUNT: usize = (isize::MAX) as usize;
 /// }
 /// ```
 #[unsafe_no_drop_flag]
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Arc<T: ?Sized> {
     // FIXME #12808: strange name to try to avoid interfering with
     // field accesses of the contained type via Deref
     _ptr: Shared<ArcInner<T>>,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 unsafe impl<T: ?Sized + Sync + Send> Send for Arc<T> {}
-#[stable(feature = "rust1", since = "1.0.0")]
 unsafe impl<T: ?Sized + Sync + Send> Sync for Arc<T> {}
 
 // remove cfg after new snapshot
 #[cfg(not(stage0))]
-#[unstable(feature = "coerce_unsized", issue = "27732")]
 impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<Arc<U>> for Arc<T> {}
 
 /// A weak pointer to an `Arc`.
@@ -145,24 +139,19 @@ impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<Arc<U>> for Arc<T> {}
 /// Weak pointers will not keep the data inside of the `Arc` alive, and can be
 /// used to break cycles between `Arc` pointers.
 #[unsafe_no_drop_flag]
-#[stable(feature = "arc_weak", since = "1.4.0")]
 pub struct Weak<T: ?Sized> {
     // FIXME #12808: strange name to try to avoid interfering with
     // field accesses of the contained type via Deref
     _ptr: Shared<ArcInner<T>>,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 unsafe impl<T: ?Sized + Sync + Send> Send for Weak<T> {}
-#[stable(feature = "rust1", since = "1.0.0")]
 unsafe impl<T: ?Sized + Sync + Send> Sync for Weak<T> {}
 
 // remove cfg after new snapshot
 #[cfg(not(stage0))]
-#[unstable(feature = "coerce_unsized", issue = "27732")]
 impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<Weak<U>> for Weak<T> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + fmt::Debug> fmt::Debug for Weak<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(Weak)")
@@ -194,7 +183,6 @@ impl<T> Arc<T> {
     /// let five = Arc::new(5);
     /// ```
     #[inline]
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new(data: T) -> Arc<T> {
         // Start the weak pointer count as 1 which is the weak pointer that's
         // held by all the strong pointers (kinda), see std/rc.rs for more info
@@ -224,7 +212,6 @@ impl<T> Arc<T> {
     /// assert_eq!(Arc::try_unwrap(x), Err(Arc::new(4)));
     /// ```
     #[inline]
-    #[stable(feature = "arc_unique", since = "1.4.0")]
     pub fn try_unwrap(this: Self) -> Result<T, Self> {
         // See `drop` for why all these atomics are like this
         if this.inner().strong.compare_and_swap(1, 0, Release) != 1 {
@@ -258,7 +245,6 @@ impl<T: ?Sized> Arc<T> {
     ///
     /// let weak_five = Arc::downgrade(&five);
     /// ```
-    #[stable(feature = "arc_weak", since = "1.4.0")]
     pub fn downgrade(this: &Self) -> Weak<T> {
         loop {
             // This Relaxed is OK because we're checking the value in the CAS
@@ -285,16 +271,12 @@ impl<T: ?Sized> Arc<T> {
 
     /// Get the number of weak references to this value.
     #[inline]
-    #[unstable(feature = "arc_counts", reason = "not clearly useful, and racy",
-               issue = "28356")]
     pub fn weak_count(this: &Self) -> usize {
         this.inner().weak.load(SeqCst) - 1
     }
 
     /// Get the number of strong references to this value.
     #[inline]
-    #[unstable(feature = "arc_counts", reason = "not clearly useful, and racy",
-               issue = "28356")]
     pub fn strong_count(this: &Self) -> usize {
         this.inner().strong.load(SeqCst)
     }
@@ -325,7 +307,6 @@ impl<T: ?Sized> Arc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Clone for Arc<T> {
     /// Makes a clone of the `Arc<T>`.
     ///
@@ -374,7 +355,6 @@ impl<T: ?Sized> Clone for Arc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Deref for Arc<T> {
     type Target = T;
 
@@ -385,9 +365,6 @@ impl<T: ?Sized> Deref for Arc<T> {
 }
 
 impl<T: Clone> Arc<T> {
-    #[unstable(feature = "arc_make_unique", reason = "renamed to Arc::make_mut",
-               issue = "27718")]
-    #[rustc_deprecated(since = "1.4.0", reason = "renamed to Arc::make_mut")]
     pub fn make_unique(this: &mut Self) -> &mut T {
         Arc::make_mut(this)
     }
@@ -417,7 +394,6 @@ impl<T: Clone> Arc<T> {
     ///
     /// ```
     #[inline]
-    #[stable(feature = "arc_unique", since = "1.4.0")]
     pub fn make_mut(this: &mut Self) -> &mut T {
         // Note that we hold both a strong reference and a weak reference.
         // Thus, releasing our strong reference only will not, by itself, cause
@@ -489,7 +465,6 @@ impl<T: ?Sized> Arc<T> {
     /// assert!(Arc::get_mut(&mut x).is_none());
     /// ```
     #[inline]
-    #[stable(feature = "arc_unique", since = "1.4.0")]
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
         if this.is_unique() {
             // This unsafety is ok because we're guaranteed that the pointer
@@ -534,7 +509,6 @@ impl<T: ?Sized> Arc<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Drop for Arc<T> {
     /// Drops the `Arc<T>`.
     ///
@@ -624,7 +598,6 @@ impl<T: ?Sized> Weak<T> {
     ///
     /// let strong_five: Option<Arc<_>> = weak_five.upgrade();
     /// ```
-    #[stable(feature = "arc_weak", since = "1.4.0")]
     pub fn upgrade(&self) -> Option<Arc<T>> {
         // We use a CAS loop to increment the strong count instead of a
         // fetch_add because once the count hits 0 it must never be above 0.
@@ -659,7 +632,6 @@ impl<T: ?Sized> Weak<T> {
     }
 }
 
-#[stable(feature = "arc_weak", since = "1.4.0")]
 impl<T: ?Sized> Clone for Weak<T> {
     /// Makes a clone of the `Weak<T>`.
     ///
@@ -693,7 +665,6 @@ impl<T: ?Sized> Clone for Weak<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Drop for Weak<T> {
     /// Drops the `Weak<T>`.
     ///
@@ -743,7 +714,6 @@ impl<T: ?Sized> Drop for Weak<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + PartialEq> PartialEq for Arc<T> {
     /// Equality for two `Arc<T>`s.
     ///
@@ -779,7 +749,6 @@ impl<T: ?Sized + PartialEq> PartialEq for Arc<T> {
         *(*self) != *(*other)
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + PartialOrd> PartialOrd for Arc<T> {
     /// Partial comparison for two `Arc<T>`s.
     ///
@@ -866,51 +835,43 @@ impl<T: ?Sized + PartialOrd> PartialOrd for Arc<T> {
         *(*self) >= *(*other)
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + Ord> Ord for Arc<T> {
     fn cmp(&self, other: &Arc<T>) -> Ordering {
         (**self).cmp(&**other)
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + Eq> Eq for Arc<T> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + fmt::Display> fmt::Display for Arc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + fmt::Debug> fmt::Debug for Arc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&**self, f)
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> fmt::Pointer for Arc<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&*self._ptr, f)
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: Default> Default for Arc<T> {
     fn default() -> Arc<T> {
         Arc::new(Default::default())
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized + Hash> Hash for Arc<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         (**self).hash(state)
     }
 }
 
-#[stable(feature = "from_for_ptrs", since = "1.6.0")]
 impl<T> From<T> for Arc<T> {
     fn from(t: T) -> Self {
         Arc::new(t)
@@ -1169,14 +1130,12 @@ mod tests {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> borrow::Borrow<T> for Arc<T> {
     fn borrow(&self) -> &T {
         &**self
     }
 }
 
-#[stable(since = "1.5.0", feature = "smart_ptr_as_ref")]
 impl<T: ?Sized> AsRef<T> for Arc<T> {
     fn as_ref(&self) -> &T {
         &**self

@@ -20,16 +20,30 @@
 #![cfg_attr(test, feature(step_trait))]
 #![cfg_attr(test, feature(zero_one))]
 
+// features for mod alloc
+#![feature(allocator, needs_allocator, lang_items, fundamental, unboxed_closures)]
+#![feature(optin_builtin_traits)]
+#![feature(box_heap, coerce_unsized, shared, unsize)]
+#![feature(core_slice_ext)]
+
 #[cfg(test)]
 extern crate test;
+
+// Allow testing mod alloc.
+
+#[cfg(test)]
+#[macro_use]
+extern crate log;
 
 #[path="std/mod.rs"]
 mod std_mod;
 
 extern crate core;
-extern crate alloc;
+extern crate alloc as core_alloc;
 // extern crate collections as core_collections;
 extern crate rand;
+
+mod alloc;
 
 #[path="collections/mod.rs"]
 mod core_collections;
