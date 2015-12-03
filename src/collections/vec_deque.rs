@@ -16,7 +16,6 @@
 //! are not required to be copyable, and the queue will be sendable if the
 //! contained type is sendable.
 
-#![stable(feature = "rust1", since = "1.0.0")]
 
 use core::cmp::Ordering;
 use core::fmt;
@@ -45,7 +44,6 @@ const MAXIMUM_ZST_CAPACITY: usize = 1 << (usize::BITS - 1); // Largest possible 
 /// the queue, and `pop_front` to remove from the queue. `extend` and `append`
 /// push onto the back in this manner, and iterating over `VecDeque` goes front
 /// to back.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct VecDeque<T> {
     // tail and head are pointers into the buffer. Tail always points
     // to the first element that could be read, Head always points
@@ -57,14 +55,12 @@ pub struct VecDeque<T> {
     buf: RawVec<T>,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: Clone> Clone for VecDeque<T> {
     fn clone(&self) -> VecDeque<T> {
         self.iter().cloned().collect()
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Drop for VecDeque<T> {
     #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
@@ -73,7 +69,6 @@ impl<T> Drop for VecDeque<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Default for VecDeque<T> {
     #[inline]
     fn default() -> VecDeque<T> {
@@ -357,13 +352,11 @@ impl<T> VecDeque<T> {
 
 impl<T> VecDeque<T> {
     /// Creates an empty `VecDeque`.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn new() -> VecDeque<T> {
         VecDeque::with_capacity(INITIAL_CAPACITY)
     }
 
     /// Creates an empty `VecDeque` with space for at least `n` elements.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn with_capacity(n: usize) -> VecDeque<T> {
         // +1 since the ringbuffer always leaves one space empty
         let cap = cmp::max(n + 1, MINIMUM_CAPACITY + 1).next_power_of_two();
@@ -389,7 +382,6 @@ impl<T> VecDeque<T> {
     /// buf.push_back(5);
     /// assert_eq!(buf.get(1), Some(&4));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get(&self, index: usize) -> Option<&T> {
         if index < self.len() {
             let idx = self.wrap_add(self.tail, index);
@@ -416,7 +408,6 @@ impl<T> VecDeque<T> {
     ///
     /// assert_eq!(buf[1], 7);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         if index < self.len() {
             let idx = self.wrap_add(self.tail, index);
@@ -445,7 +436,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf[0], 5);
     /// assert_eq!(buf[2], 3);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn swap(&mut self, i: usize, j: usize) {
         assert!(i < self.len());
         assert!(j < self.len());
@@ -469,7 +459,6 @@ impl<T> VecDeque<T> {
     /// assert!(buf.capacity() >= 10);
     /// ```
     #[inline]
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn capacity(&self) -> usize {
         self.cap() - 1
     }
@@ -494,7 +483,6 @@ impl<T> VecDeque<T> {
     /// buf.reserve_exact(10);
     /// assert!(buf.capacity() >= 11);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn reserve_exact(&mut self, additional: usize) {
         self.reserve(additional);
     }
@@ -515,7 +503,6 @@ impl<T> VecDeque<T> {
     /// buf.reserve(10);
     /// assert!(buf.capacity() >= 11);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn reserve(&mut self, additional: usize) {
         let old_cap = self.cap();
         let used_cap = self.len() + 1;
@@ -547,7 +534,6 @@ impl<T> VecDeque<T> {
     /// buf.shrink_to_fit();
     /// assert!(buf.capacity() >= 4);
     /// ```
-    #[stable(feature = "deque_extras_15", since = "1.5.0")]
     pub fn shrink_to_fit(&mut self) {
         // +1 since the ringbuffer always leaves one space empty
         // len + 1 can't overflow for an existing, well-formed ringbuffer.
@@ -627,9 +613,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf.len(), 1);
     /// assert_eq!(Some(&5), buf.get(0));
     /// ```
-    #[unstable(feature = "deque_extras",
-               reason = "matches collection reform specification; waiting on panic semantics",
-               issue = "27788")]
     pub fn truncate(&mut self, len: usize) {
         for _ in len..self.len() {
             self.pop_back();
@@ -651,7 +634,6 @@ impl<T> VecDeque<T> {
     /// let c: Vec<&i32> = buf.iter().collect();
     /// assert_eq!(&c[..], b);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn iter(&self) -> Iter<T> {
         Iter {
             tail: self.tail,
@@ -677,7 +659,6 @@ impl<T> VecDeque<T> {
     /// let b: &[_] = &[&mut 3, &mut 1, &mut 2];
     /// assert_eq!(&buf.iter_mut().collect::<Vec<&mut i32>>()[..], b);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn iter_mut(&mut self) -> IterMut<T> {
         IterMut {
             tail: self.tail,
@@ -689,7 +670,6 @@ impl<T> VecDeque<T> {
     /// Returns a pair of slices which contain, in order, the contents of the
     /// `VecDeque`.
     #[inline]
-    #[stable(feature = "deque_extras_15", since = "1.5.0")]
     pub fn as_slices(&self) -> (&[T], &[T]) {
         unsafe {
             let contiguous = self.is_contiguous();
@@ -708,7 +688,6 @@ impl<T> VecDeque<T> {
     /// Returns a pair of slices which contain, in order, the contents of the
     /// `VecDeque`.
     #[inline]
-    #[stable(feature = "deque_extras_15", since = "1.5.0")]
     pub fn as_mut_slices(&mut self) -> (&mut [T], &mut [T]) {
         unsafe {
             let contiguous = self.is_contiguous();
@@ -740,7 +719,6 @@ impl<T> VecDeque<T> {
     /// v.push_back(1);
     /// assert_eq!(v.len(), 1);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn len(&self) -> usize {
         count(self.tail, self.head, self.cap())
     }
@@ -757,7 +735,6 @@ impl<T> VecDeque<T> {
     /// v.push_front(1);
     /// assert!(!v.is_empty());
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -789,9 +766,6 @@ impl<T> VecDeque<T> {
     /// assert!(v.is_empty());
     /// ```
     #[inline]
-    #[unstable(feature = "drain",
-               reason = "matches collection reform specification, waiting for dust to settle",
-               issue = "27711")]
     pub fn drain<R>(&mut self, range: R) -> Drain<T>
         where R: RangeArgument<usize>
     {
@@ -859,7 +833,6 @@ impl<T> VecDeque<T> {
     /// v.clear();
     /// assert!(v.is_empty());
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
     pub fn clear(&mut self) {
         self.drain(..);
@@ -880,7 +853,6 @@ impl<T> VecDeque<T> {
     /// d.push_back(2);
     /// assert_eq!(d.front(), Some(&1));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn front(&self) -> Option<&T> {
         if !self.is_empty() {
             Some(&self[0])
@@ -908,7 +880,6 @@ impl<T> VecDeque<T> {
     /// }
     /// assert_eq!(d.front(), Some(&9));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn front_mut(&mut self) -> Option<&mut T> {
         if !self.is_empty() {
             Some(&mut self[0])
@@ -932,7 +903,6 @@ impl<T> VecDeque<T> {
     /// d.push_back(2);
     /// assert_eq!(d.back(), Some(&2));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn back(&self) -> Option<&T> {
         if !self.is_empty() {
             Some(&self[self.len() - 1])
@@ -960,7 +930,6 @@ impl<T> VecDeque<T> {
     /// }
     /// assert_eq!(d.back(), Some(&9));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn back_mut(&mut self) -> Option<&mut T> {
         let len = self.len();
         if !self.is_empty() {
@@ -986,7 +955,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(d.pop_front(), Some(2));
     /// assert_eq!(d.pop_front(), None);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn pop_front(&mut self) -> Option<T> {
         if self.is_empty() {
             None
@@ -1009,7 +977,6 @@ impl<T> VecDeque<T> {
     /// d.push_front(2);
     /// assert_eq!(d.front(), Some(&2));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn push_front(&mut self, value: T) {
         if self.is_full() {
             let old_cap = self.cap();
@@ -1039,7 +1006,6 @@ impl<T> VecDeque<T> {
     /// buf.push_back(3);
     /// assert_eq!(3, *buf.back().unwrap());
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn push_back(&mut self, value: T) {
         if self.is_full() {
             let old_cap = self.cap();
@@ -1069,7 +1035,6 @@ impl<T> VecDeque<T> {
     /// buf.push_back(3);
     /// assert_eq!(buf.pop_back(), Some(3));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn pop_back(&mut self) -> Option<T> {
         if self.is_empty() {
             None
@@ -1108,7 +1073,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf[0], 3);
     /// assert_eq!(buf[1], 2);
     /// ```
-    #[stable(feature = "deque_extras_15", since = "1.5.0")]
     pub fn swap_remove_back(&mut self, index: usize) -> Option<T> {
         let length = self.len();
         if length > 0 && index < length - 1 {
@@ -1120,10 +1084,6 @@ impl<T> VecDeque<T> {
     }
 
     /// deprecated
-    #[unstable(feature = "deque_extras",
-               reason = "the naming of this function may be altered",
-               issue = "27788")]
-    #[rustc_deprecated(since = "1.5.0", reason = "renamed to swap_remove_back")]
     pub fn swap_back_remove(&mut self, index: usize) -> Option<T> {
         self.swap_remove_back(index)
     }
@@ -1151,7 +1111,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf[0], 2);
     /// assert_eq!(buf[1], 1);
     /// ```
-    #[stable(feature = "deque_extras_15", since = "1.5.0")]
     pub fn swap_remove_front(&mut self, index: usize) -> Option<T> {
         let length = self.len();
         if length > 0 && index < length && index != 0 {
@@ -1163,10 +1122,6 @@ impl<T> VecDeque<T> {
     }
 
     /// deprecated
-    #[unstable(feature = "deque_extras",
-               reason = "the naming of this function may be altered",
-               issue = "27788")]
-    #[rustc_deprecated(since = "1.5.0", reason = "renamed to swap_remove_front")]
     pub fn swap_front_remove(&mut self, index: usize) -> Option<T> {
         self.swap_remove_front(index)
     }
@@ -1189,7 +1144,6 @@ impl<T> VecDeque<T> {
     /// buf.insert(1, 11);
     /// assert_eq!(Some(&11), buf.get(1));
     /// ```
-    #[stable(feature = "deque_extras_15", since = "1.5.0")]
     pub fn insert(&mut self, index: usize, value: T) {
         assert!(index <= self.len(), "index out of bounds");
         if self.is_full() {
@@ -1414,7 +1368,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf.remove(1), Some(2));
     /// assert_eq!(buf.get(1), Some(&3));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn remove(&mut self, index: usize) -> Option<T> {
         if self.is_empty() || self.len() <= index {
             return None;
@@ -1596,7 +1549,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf2.len(), 2);
     /// ```
     #[inline]
-    #[stable(feature = "split_off", since = "1.4.0")]
     pub fn split_off(&mut self, at: usize) -> Self {
         let len = self.len();
         assert!(at <= len, "`at` out of bounds");
@@ -1657,7 +1609,6 @@ impl<T> VecDeque<T> {
     /// assert_eq!(buf2.len(), 0);
     /// ```
     #[inline]
-    #[stable(feature = "append", since = "1.4.0")]
     pub fn append(&mut self, other: &mut Self) {
         // naive impl
         self.extend(other.drain(..));
@@ -1681,7 +1632,6 @@ impl<T> VecDeque<T> {
     /// let v: Vec<_> = buf.into_iter().collect();
     /// assert_eq!(&v[..], &[2, 4]);
     /// ```
-    #[stable(feature = "vec_deque_retain", since = "1.4.0")]
     pub fn retain<F>(&mut self, mut f: F)
         where F: FnMut(&T) -> bool
     {
@@ -1721,9 +1671,6 @@ impl<T: Clone> VecDeque<T> {
     ///     assert_eq!(a, b);
     /// }
     /// ```
-    #[unstable(feature = "deque_extras",
-               reason = "matches collection reform specification; waiting on panic semantics",
-               issue = "27788")]
     pub fn resize(&mut self, new_len: usize, value: T) {
         let len = self.len();
 
@@ -1751,7 +1698,6 @@ fn count(tail: usize, head: usize, size: usize) -> usize {
 }
 
 /// `VecDeque` iterator.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Iter<'a, T: 'a> {
     ring: &'a [T],
     tail: usize,
@@ -1759,7 +1705,6 @@ pub struct Iter<'a, T: 'a> {
 }
 
 // FIXME(#19839) Remove in favor of `#[derive(Clone)]`
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> Clone for Iter<'a, T> {
     fn clone(&self) -> Iter<'a, T> {
         Iter {
@@ -1770,7 +1715,6 @@ impl<'a, T> Clone for Iter<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
@@ -1791,7 +1735,6 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a T> {
@@ -1803,18 +1746,15 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> ExactSizeIterator for Iter<'a, T> {}
 
 /// `VecDeque` mutable iterator.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IterMut<'a, T: 'a> {
     ring: &'a mut [T],
     tail: usize,
     head: usize,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
@@ -1839,7 +1779,6 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a mut T> {
@@ -1855,17 +1794,14 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> ExactSizeIterator for IterMut<'a, T> {}
 
 /// A by-value VecDeque iterator
 #[derive(Clone)]
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IntoIter<T> {
     inner: VecDeque<T>,
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
@@ -1881,7 +1817,6 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> DoubleEndedIterator for IntoIter<T> {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
@@ -1889,13 +1824,9 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> ExactSizeIterator for IntoIter<T> {}
 
 /// A draining VecDeque iterator
-#[unstable(feature = "drain",
-           reason = "matches collection reform specification, waiting for dust to settle",
-           issue = "27711")]
 pub struct Drain<'a, T: 'a> {
     after_tail: usize,
     after_head: usize,
@@ -1903,12 +1834,9 @@ pub struct Drain<'a, T: 'a> {
     deque: *mut VecDeque<T>,
 }
 
-#[unstable(feature = "drain", issue = "27711")]
 unsafe impl<'a, T: Sync> Sync for Drain<'a, T> {}
-#[unstable(feature = "drain", issue = "27711")]
 unsafe impl<'a, T: Send> Send for Drain<'a, T> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T: 'a> Drop for Drain<'a, T> {
     fn drop(&mut self) {
         for _ in self.by_ref() {}
@@ -1957,7 +1885,6 @@ impl<'a, T: 'a> Drop for Drain<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T: 'a> Iterator for Drain<'a, T> {
     type Item = T;
 
@@ -1972,7 +1899,6 @@ impl<'a, T: 'a> Iterator for Drain<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
@@ -1980,27 +1906,22 @@ impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T: 'a> ExactSizeIterator for Drain<'a, T> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A: PartialEq> PartialEq for VecDeque<A> {
     fn eq(&self, other: &VecDeque<A>) -> bool {
         self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a.eq(b))
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A: Eq> Eq for VecDeque<A> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A: PartialOrd> PartialOrd for VecDeque<A> {
     fn partial_cmp(&self, other: &VecDeque<A>) -> Option<Ordering> {
         self.iter().partial_cmp(other.iter())
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A: Ord> Ord for VecDeque<A> {
     #[inline]
     fn cmp(&self, other: &VecDeque<A>) -> Ordering {
@@ -2008,7 +1929,6 @@ impl<A: Ord> Ord for VecDeque<A> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A: Hash> Hash for VecDeque<A> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.len().hash(state);
@@ -2018,7 +1938,6 @@ impl<A: Hash> Hash for VecDeque<A> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A> Index<usize> for VecDeque<A> {
     type Output = A;
 
@@ -2028,7 +1947,6 @@ impl<A> Index<usize> for VecDeque<A> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A> IndexMut<usize> for VecDeque<A> {
     #[inline]
     fn index_mut(&mut self, index: usize) -> &mut A {
@@ -2036,7 +1954,6 @@ impl<A> IndexMut<usize> for VecDeque<A> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A> FromIterator<A> for VecDeque<A> {
     fn from_iter<T: IntoIterator<Item = A>>(iterable: T) -> VecDeque<A> {
         let iterator = iterable.into_iter();
@@ -2047,7 +1964,6 @@ impl<A> FromIterator<A> for VecDeque<A> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> IntoIterator for VecDeque<T> {
     type Item = T;
     type IntoIter = IntoIter<T>;
@@ -2059,7 +1975,6 @@ impl<T> IntoIterator for VecDeque<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> IntoIterator for &'a VecDeque<T> {
     type Item = &'a T;
     type IntoIter = Iter<'a, T>;
@@ -2069,7 +1984,6 @@ impl<'a, T> IntoIterator for &'a VecDeque<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> IntoIterator for &'a mut VecDeque<T> {
     type Item = &'a mut T;
     type IntoIter = IterMut<'a, T>;
@@ -2079,7 +1993,6 @@ impl<'a, T> IntoIterator for &'a mut VecDeque<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<A> Extend<A> for VecDeque<A> {
     fn extend<T: IntoIterator<Item = A>>(&mut self, iter: T) {
         for elt in iter {
@@ -2088,14 +2001,12 @@ impl<A> Extend<A> for VecDeque<A> {
     }
 }
 
-#[stable(feature = "extend_ref", since = "1.2.0")]
 impl<'a, T: 'a + Copy> Extend<&'a T> for VecDeque<T> {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.extend(iter.into_iter().cloned());
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: fmt::Debug> fmt::Debug for VecDeque<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_list().entries(self).finish()

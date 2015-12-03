@@ -66,7 +66,6 @@ use super::node::{self, Node, Found, GoDown};
 /// any other key, as determined by the `Ord` trait, changes while it is in the map. This is
 /// normally only possible through `Cell`, `RefCell`, global state, I/O, or unsafe code.
 #[derive(Clone)]
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct BTreeMap<K, V> {
     root: Node<K, V>,
     length: usize,
@@ -82,31 +81,26 @@ struct AbsIter<T> {
 }
 
 /// An iterator over a BTreeMap's entries.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Iter<'a, K: 'a, V: 'a> {
     inner: AbsIter<Traversal<'a, K, V>>,
 }
 
 /// A mutable iterator over a BTreeMap's entries.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IterMut<'a, K: 'a, V: 'a> {
     inner: AbsIter<MutTraversal<'a, K, V>>,
 }
 
 /// An owning iterator over a BTreeMap's entries.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct IntoIter<K, V> {
     inner: AbsIter<MoveTraversal<K, V>>,
 }
 
 /// An iterator over a BTreeMap's keys.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Keys<'a, K: 'a, V: 'a> {
     inner: Map<Iter<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>,
 }
 
 /// An iterator over a BTreeMap's values.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Values<'a, K: 'a, V: 'a> {
     inner: Map<Iter<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>,
 }
@@ -122,33 +116,27 @@ pub struct RangeMut<'a, K: 'a, V: 'a> {
 }
 
 /// A view into a single entry in a map, which may either be vacant or occupied.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub enum Entry<'a, K: 'a, V: 'a> {
     /// A vacant Entry
-    #[stable(feature = "rust1", since = "1.0.0")]
     Vacant(VacantEntry<'a, K, V>),
 
     /// An occupied Entry
-    #[stable(feature = "rust1", since = "1.0.0")]
     Occupied(OccupiedEntry<'a, K, V>),
 }
 
 /// A vacant Entry.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct VacantEntry<'a, K: 'a, V: 'a> {
     key: K,
     stack: stack::SearchStack<'a, K, V, node::handle::Edge, node::handle::Leaf>,
 }
 
 /// An occupied Entry.
-#[stable(feature = "rust1", since = "1.0.0")]
 pub struct OccupiedEntry<'a, K: 'a, V: 'a> {
     stack: stack::SearchStack<'a, K, V, node::handle::KV, node::handle::LeafOrInternal>,
 }
 
 impl<K: Ord, V> BTreeMap<K, V> {
     /// Makes a new empty BTreeMap with a reasonable choice for B.
-    #[stable(feature = "rust1", since = "1.0.0")]
     #[allow(deprecated)]
     pub fn new() -> BTreeMap<K, V> {
         // FIXME(Gankro): Tune this as a function of size_of<K/V>?
@@ -158,10 +146,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// Makes a new empty BTreeMap with the given B.
     ///
     /// B cannot be less than 2.
-    #[unstable(feature = "btree_b",
-               reason = "probably want this to be on the type, eventually",
-               issue = "27795")]
-    #[rustc_deprecated(since = "1.4.0", reason = "niche API")]
     pub fn with_b(b: usize) -> BTreeMap<K, V> {
         assert!(b > 1, "B must be greater than 1");
         BTreeMap {
@@ -184,7 +168,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// a.clear();
     /// assert!(a.is_empty());
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     #[allow(deprecated)]
     pub fn clear(&mut self) {
         let b = self.b;
@@ -215,7 +198,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert_eq!(map.get(&1), Some(&"a"));
     /// assert_eq!(map.get(&2), None);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
         where K: Borrow<Q>,
               Q: Ord
@@ -252,7 +234,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert_eq!(map.contains_key(&1), true);
     /// assert_eq!(map.contains_key(&2), false);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
         where K: Borrow<Q>,
               Q: Ord
@@ -278,7 +259,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert_eq!(map[&1], "b");
     /// ```
     // See `get` for implementation notes, this is basically a copy-paste with mut's added
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
         where K: Borrow<Q>,
               Q: Ord
@@ -351,7 +331,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert_eq!(map.insert(37, "c"), Some("b"));
     /// assert_eq!(map[&37], "c");
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn insert(&mut self, mut key: K, mut value: V) -> Option<V> {
         // This is a stack of rawptrs to nodes paired with indices, respectively
         // representing the nodes and edges of our search path. We have to store rawptrs
@@ -460,7 +439,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert_eq!(map.remove(&1), Some("a"));
     /// assert_eq!(map.remove(&1), None);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
         where K: Borrow<Q>,
               Q: Ord
@@ -492,7 +470,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K, V> IntoIterator for BTreeMap<K, V> {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
@@ -526,7 +503,6 @@ impl<K, V> IntoIterator for BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> IntoIterator for &'a BTreeMap<K, V> {
     type Item = (&'a K, &'a V);
     type IntoIter = Iter<'a, K, V>;
@@ -536,7 +512,6 @@ impl<'a, K, V> IntoIterator for &'a BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> IntoIterator for &'a mut BTreeMap<K, V> {
     type Item = (&'a K, &'a mut V);
     type IntoIter = IterMut<'a, K, V>;
@@ -887,7 +862,6 @@ mod stack {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Ord, V> FromIterator<(K, V)> for BTreeMap<K, V> {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> BTreeMap<K, V> {
         let mut map = BTreeMap::new();
@@ -896,7 +870,6 @@ impl<K: Ord, V> FromIterator<(K, V)> for BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Ord, V> Extend<(K, V)> for BTreeMap<K, V> {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
@@ -906,14 +879,12 @@ impl<K: Ord, V> Extend<(K, V)> for BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "extend_ref", since = "1.2.0")]
 impl<'a, K: Ord + Copy, V: Copy> Extend<(&'a K, &'a V)> for BTreeMap<K, V> {
     fn extend<I: IntoIterator<Item = (&'a K, &'a V)>>(&mut self, iter: I) {
         self.extend(iter.into_iter().map(|(&key, &value)| (key, value)));
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Hash, V: Hash> Hash for BTreeMap<K, V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for elt in self {
@@ -922,24 +893,20 @@ impl<K: Hash, V: Hash> Hash for BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Ord, V> Default for BTreeMap<K, V> {
     fn default() -> BTreeMap<K, V> {
         BTreeMap::new()
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: PartialEq, V: PartialEq> PartialEq for BTreeMap<K, V> {
     fn eq(&self, other: &BTreeMap<K, V>) -> bool {
         self.len() == other.len() && self.iter().zip(other).all(|(a, b)| a == b)
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Eq, V: Eq> Eq for BTreeMap<K, V> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: PartialOrd, V: PartialOrd> PartialOrd for BTreeMap<K, V> {
     #[inline]
     fn partial_cmp(&self, other: &BTreeMap<K, V>) -> Option<Ordering> {
@@ -947,7 +914,6 @@ impl<K: PartialOrd, V: PartialOrd> PartialOrd for BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Ord, V: Ord> Ord for BTreeMap<K, V> {
     #[inline]
     fn cmp(&self, other: &BTreeMap<K, V>) -> Ordering {
@@ -955,14 +921,12 @@ impl<K: Ord, V: Ord> Ord for BTreeMap<K, V> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K: Debug, V: Debug> Debug for BTreeMap<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_map().entries(self.iter()).finish()
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K: Ord, Q: ?Sized, V> Index<&'a Q> for BTreeMap<K, V>
     where K: Borrow<Q>,
           Q: Ord
@@ -1092,7 +1056,6 @@ impl<'a, K, V> Clone for Iter<'a, K, V> {
         Iter { inner: self.inner.clone() }
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
@@ -1103,16 +1066,13 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
         self.inner.size_hint()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> DoubleEndedIterator for Iter<'a, K, V> {
     fn next_back(&mut self) -> Option<(&'a K, &'a V)> {
         self.inner.next_back()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> Iterator for IterMut<'a, K, V> {
     type Item = (&'a K, &'a mut V);
 
@@ -1123,16 +1083,13 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
         self.inner.size_hint()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> DoubleEndedIterator for IterMut<'a, K, V> {
     fn next_back(&mut self) -> Option<(&'a K, &'a mut V)> {
         self.inner.next_back()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> ExactSizeIterator for IterMut<'a, K, V> {}
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K, V> Iterator for IntoIter<K, V> {
     type Item = (K, V);
 
@@ -1143,13 +1100,11 @@ impl<K, V> Iterator for IntoIter<K, V> {
         self.inner.size_hint()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K, V> DoubleEndedIterator for IntoIter<K, V> {
     fn next_back(&mut self) -> Option<(K, V)> {
         self.inner.next_back()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<K, V> ExactSizeIterator for IntoIter<K, V> {}
 
 impl<'a, K, V> Clone for Keys<'a, K, V> {
@@ -1157,7 +1112,6 @@ impl<'a, K, V> Clone for Keys<'a, K, V> {
         Keys { inner: self.inner.clone() }
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> Iterator for Keys<'a, K, V> {
     type Item = &'a K;
 
@@ -1168,13 +1122,11 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
         self.inner.size_hint()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> DoubleEndedIterator for Keys<'a, K, V> {
     fn next_back(&mut self) -> Option<(&'a K)> {
         self.inner.next_back()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> ExactSizeIterator for Keys<'a, K, V> {}
 
 
@@ -1183,7 +1135,6 @@ impl<'a, K, V> Clone for Values<'a, K, V> {
         Values { inner: self.inner.clone() }
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> Iterator for Values<'a, K, V> {
     type Item = &'a V;
 
@@ -1194,13 +1145,11 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         self.inner.size_hint()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> DoubleEndedIterator for Values<'a, K, V> {
     fn next_back(&mut self) -> Option<(&'a V)> {
         self.inner.next_back()
     }
 }
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, K, V> ExactSizeIterator for Values<'a, K, V> {}
 
 impl<'a, K, V> Clone for Range<'a, K, V> {
@@ -1235,7 +1184,6 @@ impl<'a, K, V> DoubleEndedIterator for RangeMut<'a, K, V> {
 }
 
 impl<'a, K: Ord, V> Entry<'a, K, V> {
-    #[stable(feature = "rust1", since = "1.0.0")]
     /// Ensures a value is in the entry by inserting the default if empty, and returns
     /// a mutable reference to the value in the entry.
     pub fn or_insert(self, default: V) -> &'a mut V {
@@ -1245,7 +1193,6 @@ impl<'a, K: Ord, V> Entry<'a, K, V> {
         }
     }
 
-    #[stable(feature = "rust1", since = "1.0.0")]
     /// Ensures a value is in the entry by inserting the result of the default function if empty,
     /// and returns a mutable reference to the value in the entry.
     pub fn or_insert_with<F: FnOnce() -> V>(self, default: F) -> &'a mut V {
@@ -1259,7 +1206,6 @@ impl<'a, K: Ord, V> Entry<'a, K, V> {
 impl<'a, K: Ord, V> VacantEntry<'a, K, V> {
     /// Sets the value of the entry with the VacantEntry's key,
     /// and returns a mutable reference to it.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn insert(self, value: V) -> &'a mut V {
         self.stack.insert(self.key, value)
     }
@@ -1267,33 +1213,28 @@ impl<'a, K: Ord, V> VacantEntry<'a, K, V> {
 
 impl<'a, K: Ord, V> OccupiedEntry<'a, K, V> {
     /// Gets a reference to the value in the entry.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get(&self) -> &V {
         self.stack.peek()
     }
 
     /// Gets a mutable reference to the value in the entry.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn get_mut(&mut self) -> &mut V {
         self.stack.peek_mut()
     }
 
     /// Converts the entry into a mutable reference to its value.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn into_mut(self) -> &'a mut V {
         self.stack.into_top()
     }
 
     /// Sets the value of the entry with the OccupiedEntry's key,
     /// and returns the entry's old value.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn insert(&mut self, mut value: V) -> V {
         mem::swap(self.stack.peek_mut(), &mut value);
         value
     }
 
     /// Takes the value of the entry out of the map, and returns it.
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn remove(self) -> V {
         self.stack.remove().1
     }
@@ -1319,7 +1260,6 @@ impl<K, V> BTreeMap<K, V> {
     /// let (first_key, first_value) = map.iter().next().unwrap();
     /// assert_eq!((*first_key, *first_value), (1, "a"));
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn iter(&self) -> Iter<K, V> {
         let len = self.len();
         // NB. The initial capacity for ringbuf is large enough to avoid reallocs in many cases.
@@ -1352,7 +1292,6 @@ impl<K, V> BTreeMap<K, V> {
     ///     }
     /// }
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn iter_mut(&mut self) -> IterMut<K, V> {
         let len = self.len();
         let mut lca = VecDeque::new();
@@ -1379,7 +1318,6 @@ impl<K, V> BTreeMap<K, V> {
     /// let keys: Vec<_> = a.keys().cloned().collect();
     /// assert_eq!(keys, [1, 2]);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn keys<'a>(&'a self) -> Keys<'a, K, V> {
         fn first<A, B>((a, _): (A, B)) -> A {
             a
@@ -1403,7 +1341,6 @@ impl<K, V> BTreeMap<K, V> {
     /// let values: Vec<&str> = a.values().cloned().collect();
     /// assert_eq!(values, ["a", "b"]);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn values<'a>(&'a self) -> Values<'a, K, V> {
         fn second<A, B>((_, b): (A, B)) -> B {
             b
@@ -1425,7 +1362,6 @@ impl<K, V> BTreeMap<K, V> {
     /// a.insert(1, "a");
     /// assert_eq!(a.len(), 1);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn len(&self) -> usize {
         self.length
     }
@@ -1442,7 +1378,6 @@ impl<K, V> BTreeMap<K, V> {
     /// a.insert(1, "a");
     /// assert!(!a.is_empty());
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -1601,9 +1536,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// }
     /// assert_eq!(Some((&5, &"b")), map.range(Included(&4), Unbounded).next());
     /// ```
-    #[unstable(feature = "btree_range",
-               reason = "matches collection reform specification, waiting for dust to settle",
-               issue = "27787")]
     pub fn range<Min: ?Sized + Ord = K, Max: ?Sized + Ord = K>(&self,
                                                                min: Bound<&Min>,
                                                                max: Bound<&Max>)
@@ -1643,9 +1575,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     ///     println!("{} => {}", name, balance);
     /// }
     /// ```
-    #[unstable(feature = "btree_range",
-               reason = "matches collection reform specification, waiting for dust to settle",
-               issue = "27787")]
     pub fn range_mut<Min: ?Sized + Ord = K, Max: ?Sized + Ord = K>(&mut self,
                                                                    min: Bound<&Min>,
                                                                    max: Bound<&Max>)
@@ -1678,7 +1607,6 @@ impl<K: Ord, V> BTreeMap<K, V> {
     ///
     /// assert_eq!(count["a"], 3);
     /// ```
-    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn entry(&mut self, mut key: K) -> Entry<K, V> {
         // same basic logic of `swap` and `pop`, blended together
         let mut stack = stack::PartialSearchStack::new(self);

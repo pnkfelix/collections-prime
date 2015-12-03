@@ -13,11 +13,6 @@
 //! This module defines a container which uses an efficient bit mask
 //! representation to hold C-like enum variants.
 
-#![unstable(feature = "enumset",
-            reason = "matches collection reform specification, \
-                      waiting for dust to settle",
-            issue = "0")]
-
 use core::marker;
 use core::fmt;
 use core::iter::FromIterator;
@@ -48,7 +43,6 @@ impl<E> Clone for EnumSet<E> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<E: CLike + fmt::Debug> fmt::Debug for EnumSet<E> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_set().entries(self).finish()
@@ -273,7 +267,6 @@ impl<E: CLike> FromIterator<E> for EnumSet<E> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, E> IntoIterator for &'a EnumSet<E> where E: CLike
 {
     type Item = E;
@@ -292,7 +285,6 @@ impl<E: CLike> Extend<E> for EnumSet<E> {
     }
 }
 
-#[stable(feature = "extend_ref", since = "1.2.0")]
 impl<'a, E: 'a + CLike + Copy> Extend<&'a E> for EnumSet<E> {
     fn extend<I: IntoIterator<Item = &'a E>>(&mut self, iter: I) {
         self.extend(iter.into_iter().cloned());

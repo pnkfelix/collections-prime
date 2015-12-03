@@ -842,7 +842,7 @@ impl str {
 
     /// An iterator over the lines of a string.
     #[stable(feature = "rust1", since = "1.0.0")]
-    #[rustc_deprecated(since = "1.4.0", reason = "use lines() instead now")]
+    #[deprecated(since = "1.4.0", reason = "use lines() instead now")]
     #[inline]
     #[allow(deprecated)]
     pub fn lines_any(&self) -> LinesAny {

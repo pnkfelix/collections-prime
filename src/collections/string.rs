@@ -1085,7 +1085,7 @@ impl String {
     #[unstable(feature = "box_str2",
                reason = "recently added, matches RFC",
                issue = "27785")]
-    #[rustc_deprecated(since = "1.4.0", reason = "renamed to `into_boxed_str`")]
+    #[deprecated(since = "1.4.0", reason = "renamed to `into_boxed_str`")]
     pub fn into_boxed_slice(self) -> Box<str> {
         self.into_boxed_str()
     }
@@ -1290,8 +1290,8 @@ macro_rules! impl_eq {
 
 impl_eq! { String, str }
 impl_eq! { String, &'a str }
-impl_eq! { Cow<'a, str>, str }
-impl_eq! { Cow<'a, str>, &'b str }
+// impl_eq! { Cow<'a, str>, str }
+// impl_eq! { Cow<'a, str>, &'b str }
 impl_eq! { Cow<'a, str>, String }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1544,14 +1544,6 @@ impl<'a> From<&'a str> for String {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<'a> From<&'a str> for Cow<'a, str> {
-    #[inline]
-    fn from(s: &'a str) -> Cow<'a, str> {
-        Cow::Borrowed(s)
-    }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a> From<String> for Cow<'a, str> {
     #[inline]
     fn from(s: String) -> Cow<'a, str> {
@@ -1572,15 +1564,6 @@ impl IntoCow<'static, str> for String {
     #[inline]
     fn into_cow(self) -> Cow<'static, str> {
         Cow::Owned(self)
-    }
-}
-
-#[unstable(feature = "into_cow", reason = "may be replaced by `convert::Into`",
-           issue = "27735")]
-impl<'a> IntoCow<'a, str> for &'a str {
-    #[inline]
-    fn into_cow(self) -> Cow<'a, str> {
-        Cow::Borrowed(self)
     }
 }
 

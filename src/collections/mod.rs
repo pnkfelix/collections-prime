@@ -18,10 +18,6 @@
 #![crate_name = "collections"]
 #![cfg_attr(stage0, staged_api)]
 #![crate_type = "rlib"]
-#![unstable(feature = "collections",
-            reason = "library is unlikely to be stabilized with the current \
-                      layout and name, use std::collections instead",
-            issue = "27783")]
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/nightly/",
@@ -70,17 +66,11 @@
 #![feature(drop_in_place)]
 #![cfg_attr(test, feature(clone_from_slice, rand, test))]
 
-#![feature(no_std)]
-#![no_std]
+// #![feature(no_std)]
+// #![no_std]
 
 extern crate rustc_unicode;
 extern crate alloc;
-
-#[cfg(test)]
-#[macro_use]
-extern crate std;
-#[cfg(test)]
-extern crate test;
 
 pub use binary_heap::BinaryHeap;
 pub use btree_map::BTreeMap;
@@ -105,21 +95,17 @@ pub mod fmt;
 pub mod linked_list;
 pub mod range;
 pub mod slice;
-pub mod str;
-pub mod string;
+// pub mod str;
+// pub mod string;
 pub mod vec;
 pub mod vec_deque;
 
-#[stable(feature = "rust1", since = "1.0.0")]
 pub mod btree_map {
-    #[stable(feature = "rust1", since = "1.0.0")]
-    pub use btree::map::*;
+    pub use super::btree::map::*;
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
 pub mod btree_set {
-    #[stable(feature = "rust1", since = "1.0.0")]
-    pub use btree::set::*;
+    pub use super::btree::set::*;
 }
 
 #[cfg(not(test))]
@@ -128,7 +114,6 @@ mod std {
 }
 
 /// An endpoint of a range of keys.
-#[unstable(feature = "collections_bound", issue = "27787")]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Bound<T> {
     /// An inclusive bound.

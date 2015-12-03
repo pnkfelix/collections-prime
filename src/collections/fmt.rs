@@ -473,25 +473,15 @@
 //! them with the same character. For example, the `{` character is escaped with
 //! `{{` and the `}` character is escaped with `}}`.
 
-#![stable(feature = "rust1", since = "1.0.0")]
 
-#[unstable(feature = "fmt_internals", issue = "0")]
 pub use core::fmt::rt;
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{Formatter, Result, Write};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{Octal, Binary};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{Display, Debug};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{LowerHex, UpperHex, Pointer};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{LowerExp, UpperExp};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::Error;
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{ArgumentV1, Arguments, write, radix, Radix, RadixFmt};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::fmt::{DebugList, DebugMap, DebugSet, DebugStruct, DebugTuple};
 
 use string;
@@ -511,7 +501,6 @@ use string;
 /// let s = fmt::format(format_args!("Hello, {}!", "world"));
 /// assert_eq!(s, "Hello, world!".to_string());
 /// ```
-#[stable(feature = "rust1", since = "1.0.0")]
 pub fn format(args: Arguments) -> string::String {
     let mut output = string::String::new();
     let _ = output.write_fmt(args);
