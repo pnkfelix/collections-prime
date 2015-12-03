@@ -71,8 +71,6 @@ use core::ops;
 use core::ptr;
 use core::slice;
 
-use borrow::{Cow, IntoCow};
-
 use super::range::RangeArgument;
 
 /// A growable list type, written `Vec<T>` but pronounced 'vector.'

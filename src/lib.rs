@@ -12,11 +12,13 @@
 #![feature(core_intrinsics)]
 #![feature(num_bits_bytes)]
 #![feature(fmt_internals, fmt_radix)]
-#![feature(ptr_as_ref, ref_slice, step_by, into_cow)]
+#![feature(ptr_as_ref, ref_slice)]
 #![feature(clone_from_slice, slice_bytes)]
 #![feature(drop_in_place)]
 
 #![cfg_attr(test, feature(test, range_inclusive))]
+#![cfg_attr(test, feature(step_trait))]
+#![cfg_attr(test, feature(zero_one))]
 
 #[cfg(test)]
 extern crate test;
@@ -36,7 +38,10 @@ pub use core_collections::{binary_heap, btree_map, btree_set, vec};
 pub use core_collections::{linked_list, enum_set, vec_deque, rustc_unicode, range};
 pub use core_collections::{Bound};
 
-pub use std::{borrow, clone, cmp, default, fmt, hash, iter};
+// export public functionality
+pub use core_collections::{borrow, fmt};
+
+pub use std::{clone, cmp, default, hash, iter};
 pub use std::{marker, mem, num, ops, option, ptr, result};
 
 // slice and str almost certainly cannot be done outside of
@@ -50,6 +55,10 @@ pub use alloc::{boxed};
 #[cfg(test)]
 pub use std::{cell};
 
-#[test]
-fn it_works() {
+#[cfg(test)]
+fn range_inclusive<A>(start: A, stop: A) -> ::std::iter::RangeInclusive<A>
+    where A: ::std::iter::Step + ::std::num::One + Clone
+{
+    #![allow(deprecated)]
+    ::std::iter::range_inclusive(start, stop)
 }

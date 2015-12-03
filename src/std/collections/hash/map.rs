@@ -1602,7 +1602,7 @@ impl<K, S, Q: ?Sized> super::Recover<Q> for HashMap<K, (), S>
 mod test_map {
     use super::HashMap;
     use super::Entry::{Occupied, Vacant};
-    use iter::range_inclusive;
+    use range_inclusive;
     use cell::RefCell;
     use rand::{thread_rng, Rng};
 

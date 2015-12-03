@@ -12,7 +12,7 @@
 
 extern crate test;
 use self::test::Bencher;
-use iter::range_inclusive;
+use range_inclusive;
 
 #[bench]
 fn new_drop(b : &mut Bencher) {
