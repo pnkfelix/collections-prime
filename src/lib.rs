@@ -1,7 +1,7 @@
 #![feature(unsafe_no_drop_flag)]
 #![feature(dropck_parametricity)]
 #![feature(filling_drop)]
-#![feature(heap_api, wrapping, unique, oom)]
+#![feature(heap_api, wrapping, unique)]
 #![feature(core, alloc)]
 
 // features for mod collections
@@ -54,6 +54,9 @@ pub use core_collections::{Bound};
 
 // export public functionality
 pub use core_collections::{borrow, fmt};
+pub use alloc::{boxed, rc};
+pub use alloc::raw_vec::RawVec;
+pub mod sync { pub use alloc::arc::{Arc, Weak}; }
 
 pub use std::{clone, cmp, default, hash, iter};
 pub use std::{marker, mem, num, ops, option, ptr, result};
@@ -63,8 +66,6 @@ pub use std::{marker, mem, num, ops, option, ptr, result};
 pub use std::{slice, str, string};
 
 pub use std_mod::collections as collections;
-
-pub use alloc::{boxed};
 
 #[cfg(test)]
 pub use std::{cell};
