@@ -40,7 +40,6 @@
 /// boxed integers.
 #[cfg(not(test))]
 #[macro_export]
-#[stable(feature = "rust1", since = "1.0.0")]
 macro_rules! vec {
     ($elem:expr; $n:expr) => (
         $crate::vec::from_elem($elem, $n)
@@ -77,7 +76,6 @@ macro_rules! vec {
 /// format!("x = {}, y = {y}", 10, y = 30);
 /// ```
 #[macro_export]
-#[stable(feature = "rust1", since = "1.0.0")]
 macro_rules! format {
     ($($arg:tt)*) => ($crate::fmt::format(format_args!($($arg)*)))
 }
