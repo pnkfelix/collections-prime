@@ -2,7 +2,7 @@
 #![feature(dropck_parametricity)]
 #![feature(filling_drop)]
 #![feature(heap_api, wrapping, unique)]
-#![feature(core, alloc)]
+#![feature(alloc)]
 
 // features for mod collections
 #![feature(box_syntax)]
@@ -12,7 +12,7 @@
 #![feature(core_intrinsics)]
 #![feature(num_bits_bytes)]
 #![feature(fmt_internals, fmt_radix)]
-#![feature(ptr_as_ref, ref_slice)]
+#![feature(ptr_as_ref)]
 #![feature(clone_from_slice, slice_bytes)]
 #![feature(drop_in_place)]
 
