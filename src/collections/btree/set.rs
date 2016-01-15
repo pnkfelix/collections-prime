@@ -145,10 +145,10 @@ impl<T: Ord> BTreeSet<T> {
     /// }
     /// assert_eq!(Some(&5), set.range(Included(&4), Unbounded).next());
     /// ```
-    pub fn range<'a, Min: ?Sized + Ord = T, Max: ?Sized + Ord = T>(&'a self,
-                                                                   min: Bound<&Min>,
-                                                                   max: Bound<&Max>)
-                                                                   -> Range<'a, T>
+    pub fn range<'a, Min: ?Sized + Ord, Max: ?Sized + Ord>(&'a self,
+                                                           min: Bound<&Min>,
+                                                           max: Bound<&Max>)
+                                                           -> Range<'a, T>
         where T: Borrow<Min> + Borrow<Max>
     {
         fn first<A, B>((a, _): (A, B)) -> A {

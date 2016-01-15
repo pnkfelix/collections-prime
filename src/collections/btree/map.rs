@@ -1536,10 +1536,10 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// }
     /// assert_eq!(Some((&5, &"b")), map.range(Included(&4), Unbounded).next());
     /// ```
-    pub fn range<Min: ?Sized + Ord = K, Max: ?Sized + Ord = K>(&self,
-                                                               min: Bound<&Min>,
-                                                               max: Bound<&Max>)
-                                                               -> Range<K, V>
+    pub fn range<Min: ?Sized + Ord, Max: ?Sized + Ord>(&self,
+                                                       min: Bound<&Min>,
+                                                       max: Bound<&Max>)
+                                                       -> Range<K, V>
         where K: Borrow<Min> + Borrow<Max>
     {
         range_impl!(&self.root,
@@ -1575,10 +1575,10 @@ impl<K: Ord, V> BTreeMap<K, V> {
     ///     println!("{} => {}", name, balance);
     /// }
     /// ```
-    pub fn range_mut<Min: ?Sized + Ord = K, Max: ?Sized + Ord = K>(&mut self,
-                                                                   min: Bound<&Min>,
-                                                                   max: Bound<&Max>)
-                                                                   -> RangeMut<K, V>
+    pub fn range_mut<Min: ?Sized + Ord, Max: ?Sized + Ord>(&mut self,
+                                                           min: Bound<&Min>,
+                                                           max: Bound<&Max>)
+                                                           -> RangeMut<K, V>
         where K: Borrow<Min> + Borrow<Max>
     {
         range_impl!(&mut self.root,
