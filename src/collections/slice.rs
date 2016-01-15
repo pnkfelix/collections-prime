@@ -106,7 +106,7 @@ pub use core::slice::{Iter, IterMut};
 pub use core::slice::{SplitMut, ChunksMut, Split};
 pub use core::slice::{SplitN, RSplitN, SplitNMut, RSplitNMut};
 #[allow(deprecated)]
-pub use core::slice::{bytes, mut_ref_slice, ref_slice};
+pub use core::slice::{bytes};
 pub use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 ////////////////////////////////////////////////////////////////////////////////
