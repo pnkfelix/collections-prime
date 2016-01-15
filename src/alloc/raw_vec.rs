@@ -8,10 +8,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::ptr::Unique;
+use core::ptr::{self, Unique};
 use core::mem;
 use core::slice::{self, SliceExt};
+use core_alloc::Allocator;
 use super::heap;
+use super::heap::Allocator as HeapAllocator;
 use super::oom;
 use super::boxed::Box;
 use core::ops::Drop;
@@ -46,17 +48,42 @@ use core;
 /// field. This allows zero-sized types to not be special-cased by consumers of
 /// this type.
 #[unsafe_no_drop_flag]
-pub struct RawVec<T> {
+pub struct RawVec<T, A=HeapAllocator> where A:Allocator {
     ptr: Unique<T>,
     cap: usize,
+    a: A,
 }
 
 impl<T> RawVec<T> {
+    /// DOC TODO
+    pub fn new() -> Self { RawVec::new_in(HeapAllocator) }
+
+    /// DOC TODO
+    pub fn with_capacity(cap: usize) -> Self {
+        RawVec::with_capacity_in(cap, HeapAllocator)
+    }
+
+    /// DOC TODO
+    pub unsafe fn from_raw_parts(ptr: *mut T, cap: usize) -> Self {
+        RawVec::from_raw_parts_in(ptr, cap, HeapAllocator)
+    }
+
+    /// Converts a `Box<[T]>` into a `RawVec<T>`.
+    pub fn from_box(mut slice: Box<[T]>) -> Self {
+        unsafe {
+            let result = RawVec::from_raw_parts(slice.as_mut_ptr(), slice.len());
+            mem::forget(slice);
+            result
+        }
+    }
+}
+
+impl<T, A> RawVec<T, A> where A: Allocator {
     /// Creates the biggest possible RawVec without allocating. If T has positive
     /// size, then this makes a RawVec with capacity 0. If T has 0 size, then it
     /// it makes a RawVec with capacity `usize::MAX`. Useful for implementing
     /// delayed allocation.
-    pub fn new() -> Self {
+    pub fn new_in(a: A) -> Self {
         unsafe {
             // !0 is usize::MAX. This branch should be stripped at compile time.
             let cap = if mem::size_of::<T>() == 0 {
@@ -69,6 +96,7 @@ impl<T> RawVec<T> {
             RawVec {
                 ptr: Unique::new(heap::EMPTY as *mut T),
                 cap: cap,
+                a: a,
             }
         }
     }
@@ -87,7 +115,7 @@ impl<T> RawVec<T> {
     /// # Aborts
     ///
     /// Aborts on OOM
-    pub fn with_capacity(cap: usize) -> Self {
+    pub fn with_capacity_in(cap: usize, a: A) -> Self {
         unsafe {
             let elem_size = mem::size_of::<T>();
 
@@ -109,6 +137,7 @@ impl<T> RawVec<T> {
             RawVec {
                 ptr: Unique::new(ptr as *mut _),
                 cap: cap,
+                a: a,
             }
         }
     }
@@ -120,24 +149,16 @@ impl<T> RawVec<T> {
     /// The ptr must be allocated, and with the given capacity. The
     /// capacity cannot exceed `isize::MAX` (only a concern on 32-bit systems).
     /// If the ptr and capacity come from a RawVec, then this is guaranteed.
-    pub unsafe fn from_raw_parts(ptr: *mut T, cap: usize) -> Self {
+    pub unsafe fn from_raw_parts_in(ptr: *mut T, cap: usize, a: A) -> Self {
         RawVec {
             ptr: Unique::new(ptr),
             cap: cap,
-        }
-    }
-
-    /// Converts a `Box<[T]>` into a `RawVec<T>`.
-    pub fn from_box(mut slice: Box<[T]>) -> Self {
-        unsafe {
-            let result = RawVec::from_raw_parts(slice.as_mut_ptr(), slice.len());
-            mem::forget(slice);
-            result
+            a: a,
         }
     }
 }
 
-impl<T> RawVec<T> {
+impl<T, A> RawVec<T, A> where A: Allocator {
     /// Gets a raw pointer to the start of the allocation. Note that this is
     /// heap::EMPTY if `cap = 0` or T is zero-sized. In the former case, you must
     /// be careful.
@@ -417,7 +438,8 @@ impl<T> RawVec<T> {
         assert!(self.cap >= amount, "Tried to shrink to a larger capacity");
 
         if amount == 0 {
-            mem::replace(self, RawVec::new());
+            let a: A = unsafe { ptr::read(&self.a) };
+            mem::replace(self, RawVec::new_in(a));
         } else if self.cap != amount {
             unsafe {
                 // Overflow check is unnecessary as the vector is already at
@@ -459,7 +481,7 @@ impl<T> RawVec<T> {
     }
 }
 
-impl<T> Drop for RawVec<T> {
+impl<T, A> Drop for RawVec<T, A> where A:Allocator {
     #[unsafe_destructor_blind_to_params]
     /// Frees the memory owned by the RawVec *without* trying to Drop its contents.
     fn drop(&mut self) {

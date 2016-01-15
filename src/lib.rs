@@ -22,6 +22,7 @@
 
 // features for mod alloc
 #![feature(allocator, needs_allocator, lang_items, fundamental, unboxed_closures)]
+#![feature(allocator_api)]
 #![feature(optin_builtin_traits)]
 #![feature(box_heap, coerce_unsized, shared, unsize)]
 #![feature(core_slice_ext)]
