@@ -177,6 +177,11 @@ impl<T, A> RawVec<T, A> where A: Allocator {
         }
     }
 
+    /// DOC TODO
+    pub fn allocator(&self) -> &A {
+        &self.a
+    }
+
     /// Doubles the size of the type's backing allocation. This is common enough
     /// to want to do that it's easiest to just have a dedicated method. Slightly
     /// more efficient logic can be provided for this than the general case.
