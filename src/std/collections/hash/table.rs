@@ -8,19 +8,18 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use alloc::heap::{allocate, deallocate, EMPTY};
-use core_alloc::Allocator;
+use alloc::heap::{EMPTY};
+use core_alloc::{Allocator, Kind};
 use core_alloc::heap::Allocator as HeapAllocator;
 
-use cmp;
 use hash::{Hash, Hasher};
 use marker;
-use mem::{align_of, size_of};
 use mem;
-use num::wrapping::OverflowingOps;
 use ops::{Deref, DerefMut};
 use ptr::{self, Unique};
 use collections::hash_state::HashState;
+
+use core::nonzero;
 
 use self::BucketState::*;
 
@@ -170,7 +169,7 @@ pub fn make_hash<T: ?Sized, S>(hash_state: &S, t: &T) -> SafeHash
 // modified to no longer assume this.
 #[test]
 fn can_alias_safehash_as_u64() {
-    assert_eq!(size_of::<SafeHash>(), size_of::<u64>())
+    assert_eq!(mem::size_of::<SafeHash>(), mem::size_of::<u64>())
 }
 
 impl<K, V> RawBucket<K, V> {
@@ -504,69 +503,49 @@ impl<K, V, M: Deref<Target=RawTable<K, V>>> GapThenFull<K, V, M> {
     }
 }
 
+struct AllocationInfo {
+    kind: Kind,
+    hash_offset: usize,
+    keys_offset: usize,
+    vals_offset: usize,
+}
 
-/// Rounds up to a multiple of a power of two. Returns the closest multiple
-/// of `target_alignment` that is higher or equal to `unrounded`.
-///
-/// # Panics
-///
-/// Panics if `target_alignment` is not a power of two.
+// Returns the kind of the combined hashes-keys-values array,
+// along with the offsets of the hashes, keys, and values portions.
+//
+// `capacity` must be non-zero.
 #[inline]
-fn round_up_to_next(unrounded: usize, target_alignment: usize) -> usize {
-    assert!(target_alignment.is_power_of_two());
-    (unrounded + target_alignment - 1) & !(target_alignment - 1)
-}
+fn calculate_allocation<K, V>(capacity: usize) -> Option<AllocationInfo> {
+    debug_assert!(capacity > 0);
+    let hashes_kind = Kind::array::<u64>(capacity).unwrap();
+    let opt_keys_kind = Kind::array::<K>(capacity);
+    let opt_vals_kind = Kind::array::<V>(capacity);
 
-#[test]
-fn test_rounding() {
-    assert_eq!(round_up_to_next(0, 4), 0);
-    assert_eq!(round_up_to_next(1, 4), 4);
-    assert_eq!(round_up_to_next(2, 4), 4);
-    assert_eq!(round_up_to_next(3, 4), 4);
-    assert_eq!(round_up_to_next(4, 4), 4);
-    assert_eq!(round_up_to_next(5, 4), 8);
-}
+    let (hashes_kind, hashes_offset) = (hashes_kind, 0);
+    
+    let (hk_kind, keys_offset) = match opt_keys_kind {
+        Some(keys_kind) => match hashes_kind.extend(keys_kind) {
+            Some(kind_offset) => kind_offset,
+            None => return None,
+        },
+        None => {
+            // can zero-sized keys ever actually make sense in a hashtable?
+            let s = *hashes_kind.size(); (hashes_kind, s)
+        },
+    };
 
-// Returns a tuple of (key_offset, val_offset),
-// from the start of a mallocated array.
-#[inline]
-fn calculate_offsets(hashes_size: usize,
-                     keys_size: usize, keys_align: usize,
-                     vals_align: usize)
-                     -> (usize, usize, bool) {
-    let keys_offset = round_up_to_next(hashes_size, keys_align);
-    let (end_of_keys, oflo) = keys_offset.overflowing_add(keys_size);
+    let (hkv_kind, vals_offset) = match opt_vals_kind {
+        Some(vals_kind) => match hk_kind.extend(vals_kind) {
+            Some(hkv_kind) => hkv_kind,
+            None => return None,
+        },
+        None => { let s = *hk_kind.size(); (hk_kind, s) }
+    };
 
-    let vals_offset = round_up_to_next(end_of_keys, vals_align);
-
-    (keys_offset, vals_offset, oflo)
-}
-
-// Returns a tuple of (minimum required malloc alignment, hash_offset,
-// array_size), from the start of a mallocated array.
-fn calculate_allocation(hash_size: usize, hash_align: usize,
-                        keys_size: usize, keys_align: usize,
-                        vals_size: usize, vals_align: usize)
-                        -> (usize, usize, usize, bool) {
-    let hash_offset = 0;
-    let (_, vals_offset, oflo) = calculate_offsets(hash_size,
-                                                   keys_size, keys_align,
-                                                              vals_align);
-    let (end_of_vals, oflo2) = vals_offset.overflowing_add(vals_size);
-
-    let align = cmp::max(hash_align, cmp::max(keys_align, vals_align));
-
-    (align, hash_offset, end_of_vals, oflo || oflo2)
-}
-
-#[test]
-fn test_offset_calculation() {
-    assert_eq!(calculate_allocation(128, 8, 15, 1, 4,  4), (8, 0, 148, false));
-    assert_eq!(calculate_allocation(3,   1, 2,  1, 1,  1), (1, 0, 6, false));
-    assert_eq!(calculate_allocation(6,   2, 12, 4, 24, 8), (8, 0, 48, false));
-    assert_eq!(calculate_offsets(128, 15, 1, 4), (128, 144, false));
-    assert_eq!(calculate_offsets(3,   2,  1, 1), (3,   5, false));
-    assert_eq!(calculate_offsets(6,   12, 4, 8), (8,   24, false));
+    return Some(AllocationInfo {
+        kind: hkv_kind,
+        hash_offset: hashes_offset, keys_offset: keys_offset, vals_offset: vals_offset
+    });
 }
 
 impl<K, V> RawTable<K, V> {
@@ -580,7 +559,7 @@ impl<K, V> RawTable<K, V> {
 impl<K, V, A> RawTable<K, V, A> where A: Allocator {
     /// Does not initialize the buckets. The caller should ensure they,
     /// at the very least, set every hash to EMPTY_BUCKET.
-    unsafe fn new_uninitialized_in(capacity: usize, a: A) -> RawTable<K, V, A> {
+    unsafe fn new_uninitialized_in(capacity: usize, mut a: A) -> RawTable<K, V, A> {
         if capacity == 0 {
             return RawTable {
                 size: 0,
@@ -591,37 +570,25 @@ impl<K, V, A> RawTable<K, V, A> where A: Allocator {
             };
         }
 
-        // No need for `checked_mul` before a more restrictive check performed
-        // later in this method.
-        let hashes_size = capacity * size_of::<u64>();
-        let keys_size   = capacity * size_of::< K >();
-        let vals_size   = capacity * size_of::< V >();
-
         // Allocating hashmaps is a little tricky. We need to allocate three
         // arrays, but since we know their sizes and alignments up front,
         // we just allocate a single array, and then have the subarrays
         // point into it.
-        //
-        // This is great in theory, but in practice getting the alignment
-        // right is a little subtle. Therefore, calculating offsets has been
-        // factored out into a different function.
-        let (malloc_alignment, hash_offset, size, oflo) =
-            calculate_allocation(
-                hashes_size, align_of::<u64>(),
-                keys_size,   align_of::< K >(),
-                vals_size,   align_of::< V >());
+        let AllocationInfo { kind, hash_offset, .. } = calculate_allocation::<K, V>(capacity)
+            .unwrap_or_else(|| panic!("capcaity overflow"));
+        
+        // Check for overflow of an individual bucket.
+        Kind::new::<u64>()
+            .and_then(|hk| match Kind::new::<K>() {
+                Some(k) => hk.extend(k).map(|kd|kd.0), None => Some(hk) })
+            .and_then(|hkk| match Kind::new::<V>() {
+                Some(v) => hkk.extend(v).map(|kd|kd.0), None => Some(hkk) })
+            .unwrap_or_else(|| panic!("capacity overflow"));
 
-        assert!(!oflo, "capacity overflow");
-
-        // One check for overflow that covers calculation and rounding of size.
-        let size_of_bucket = size_of::<u64>().checked_add(size_of::<K>()).unwrap()
-                                             .checked_add(size_of::<V>()).unwrap();
-        assert!(size >= capacity.checked_mul(size_of_bucket)
-                                .expect("capacity overflow"),
-                "capacity overflow");
-
-        let buffer = allocate(size, malloc_alignment);
-        if buffer.is_null() { ::alloc::oom() }
+        let buffer = match a.alloc(kind) {
+            Ok(buffer) => buffer,
+            Err(_) => a.oom(),
+        };
 
         let hashes = buffer.offset(hash_offset as isize) as *mut u64;
 
@@ -635,15 +602,14 @@ impl<K, V, A> RawTable<K, V, A> where A: Allocator {
     }
 
     fn first_bucket_raw(&self) -> RawBucket<K, V> {
-        let hashes_size = self.capacity * size_of::<u64>();
-        let keys_size = self.capacity * size_of::<K>();
-
         let buffer = *self.hashes as *mut u8;
-        let (keys_offset, vals_offset, oflo) =
-            calculate_offsets(hashes_size,
-                              keys_size, align_of::<K>(),
-                              align_of::<V>());
-        debug_assert!(!oflo, "capacity overflow");
+        let (keys_offset, vals_offset) = if self.capacity == 0 {
+            (0, 0)
+        } else {
+            let AllocationInfo { keys_offset, vals_offset, .. } =
+                calculate_allocation::<K, V>(self.capacity).unwrap();
+            (keys_offset, vals_offset)
+        };
         unsafe {
             RawBucket {
                 hash: *self.hashes,
@@ -1027,18 +993,10 @@ impl<K, V, A> Drop for RawTable<K, V, A> where A: Allocator {
             for _ in self.rev_move_buckets() {}
         }
 
-        let hashes_size = self.capacity * size_of::<u64>();
-        let keys_size = self.capacity * size_of::<K>();
-        let vals_size = self.capacity * size_of::<V>();
-        let (align, _, size, oflo) =
-            calculate_allocation(hashes_size, align_of::<u64>(),
-                                 keys_size, align_of::<K>(),
-                                 vals_size, align_of::<V>());
-
-        debug_assert!(!oflo, "should be impossible");
+        let AllocationInfo { kind, .. } = calculate_allocation::<K, V>(self.capacity).unwrap();
 
         unsafe {
-            deallocate(*self.hashes as *mut u8, size, align);
+            self.alloc.dealloc(nonzero::NonZero::new(*self.hashes as *mut u8), kind).unwrap();
             // Remember how everything was allocated out of one buffer
             // during initialization? We only need one call to free here.
         }

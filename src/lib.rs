@@ -1,8 +1,9 @@
 #![feature(unsafe_no_drop_flag)]
 #![feature(dropck_parametricity)]
 #![feature(filling_drop)]
-#![feature(heap_api, wrapping, unique)]
+#![feature(heap_api, unique)]
 #![feature(alloc)]
+#![feature(nonzero)]
 
 // features for mod collections
 #![feature(box_syntax)]
