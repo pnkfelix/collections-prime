@@ -10,11 +10,11 @@
 
 use core::ptr::{self, Unique};
 use core::mem;
+use core::nonzero;
 use core::slice::{self, SliceExt};
-use core_alloc::Allocator;
+use core_alloc::{Allocator, Kind};
 use super::heap;
 use super::heap::Allocator as HeapAllocator;
-use super::oom;
 use super::boxed::Box;
 use core::ops::Drop;
 use core::cmp;
@@ -115,24 +115,19 @@ impl<T, A> RawVec<T, A> where A: Allocator {
     /// # Aborts
     ///
     /// Aborts on OOM
-    pub fn with_capacity_in(cap: usize, a: A) -> Self {
+    pub fn with_capacity_in(cap: usize, mut a: A) -> Self {
         unsafe {
-            let elem_size = mem::size_of::<T>();
-
-            let alloc_size = cap.checked_mul(elem_size).expect("capacity overflow");
-            alloc_guard(alloc_size);
-
-            // handles ZSTs and `cap = 0` alike
-            let ptr = if alloc_size == 0 {
-                heap::EMPTY as *mut u8
+            let ptr;
+            // handle ZSTs and `cap = 0` alike
+            if cap == 0 || mem::size_of::<T>() == 0 {
+                ptr = heap::EMPTY as *mut u8;
             } else {
-                let align = mem::align_of::<T>();
-                let ptr = heap::allocate(alloc_size, align);
-                if ptr.is_null() {
-                    oom()
-                }
-                ptr
-            };
+                let alloc_kind = Kind::array::<T>(cap)
+                    .unwrap_or_else(|| panic!("capacity overflow"));
+                
+                alloc_guard(*alloc_kind.size());
+                ptr = *a.alloc(alloc_kind).unwrap_or_else(|_| a.oom());
+            }
 
             RawVec {
                 ptr: Unique::new(ptr as *mut _),
@@ -232,8 +227,6 @@ impl<T, A> RawVec<T, A> where A: Allocator {
             // 0, getting to here necessarily means the RawVec is overfull.
             assert!(elem_size != 0, "capacity overflow");
 
-            let align = mem::align_of::<T>();
-
             let (new_cap, ptr) = if self.cap == 0 {
                 // skip to 4 because tiny Vec's are dumb; but not if that would cause overflow
                 let new_cap = if elem_size > (!0) / 8 {
@@ -241,25 +234,24 @@ impl<T, A> RawVec<T, A> where A: Allocator {
                 } else {
                     4
                 };
-                let ptr = heap::allocate(new_cap * elem_size, align);
+                let ptr = self.a.alloc(Kind::array::<T>(new_cap).unwrap());
                 (new_cap, ptr)
             } else {
                 // Since we guarantee that we never allocate more than isize::MAX bytes,
                 // `elem_size * self.cap <= isize::MAX` as a precondition, so this can't overflow
                 let new_cap = 2 * self.cap;
-                let new_alloc_size = new_cap * elem_size;
-                alloc_guard(new_alloc_size);
-                let ptr = heap::reallocate(self.ptr() as *mut _,
-                                           self.cap * elem_size,
-                                           new_alloc_size,
-                                           align);
+                let new_alloc = Kind::array::<T>(new_cap).unwrap();
+                alloc_guard(*new_alloc.size());
+                let (ptr, cap) = (self.ptr(), self.cap);
+                let alloc = &mut self.a;
+                let ptr = alloc.realloc(nonzero::NonZero::new(ptr as *mut _),
+                                        Kind::array::<T>(cap).unwrap(),
+                                        new_alloc);
                 (new_cap, ptr)
             };
 
-            // If allocate or reallocate fail, we'll get `null` back
-            if ptr.is_null() {
-                oom()
-            }
+            // If allocate or reallocate fail, we'll get `Err` back
+            let ptr = *ptr.unwrap_or_else(|_| self.a.oom());
 
             self.ptr = Unique::new(ptr as *mut _);
             self.cap = new_cap;
@@ -288,9 +280,6 @@ impl<T, A> RawVec<T, A> where A: Allocator {
     /// Aborts on OOM
     pub fn reserve_exact(&mut self, used_cap: usize, needed_extra_cap: usize) {
         unsafe {
-            let elem_size = mem::size_of::<T>();
-            let align = mem::align_of::<T>();
-
             // NOTE: we don't early branch on ZSTs here because we want this
             // to actually catch "asking for more than usize::MAX" in that case.
             // If we make it past the first branch then we are guaranteed to
@@ -304,23 +293,24 @@ impl<T, A> RawVec<T, A> where A: Allocator {
 
             // Nothing we can really do about these checks :(
             let new_cap = used_cap.checked_add(needed_extra_cap).expect("capacity overflow");
-            let new_alloc_size = new_cap.checked_mul(elem_size).expect("capacity overflow");
-            alloc_guard(new_alloc_size);
 
+            let new_alloc = Kind::array::<T>(new_cap)
+                .unwrap_or_else(|| panic!("capacity overflow"));
+            alloc_guard(*new_alloc.size());
+
+            let old_ptr = self.ptr();
+            let alloc = &mut self.a;
             let ptr = if self.cap == 0 {
-                heap::allocate(new_alloc_size, align)
+                alloc.alloc(new_alloc)
             } else {
-                heap::reallocate(self.ptr() as *mut _,
-                                 self.cap * elem_size,
-                                 new_alloc_size,
-                                 align)
+                let old_alloc = Kind::array::<T>(self.cap).unwrap();
+                alloc.realloc(nonzero::NonZero::new(old_ptr as *mut _),
+                              old_alloc,
+                              new_alloc)
             };
 
-            // If allocate or reallocate fail, we'll get `null` back
-            if ptr.is_null() {
-                oom()
-            }
-
+            // If allocate or reallocate fail, we'll get `Err` back
+            let ptr = *ptr.unwrap_or_else(|_| alloc.oom());
             self.ptr = Unique::new(ptr as *mut _);
             self.cap = new_cap;
         }
@@ -372,9 +362,6 @@ impl<T, A> RawVec<T, A> where A: Allocator {
     /// ```
     pub fn reserve(&mut self, used_cap: usize, needed_extra_cap: usize) {
         unsafe {
-            let elem_size = mem::size_of::<T>();
-            let align = mem::align_of::<T>();
-
             // NOTE: we don't early branch on ZSTs here because we want this
             // to actually catch "asking for more than usize::MAX" in that case.
             // If we make it past the first branch then we are guaranteed to
@@ -396,24 +383,24 @@ impl<T, A> RawVec<T, A> where A: Allocator {
             // `double_cap` guarantees exponential growth.
             let new_cap = cmp::max(double_cap, required_cap);
 
-            let new_alloc_size = new_cap.checked_mul(elem_size).expect("capacity overflow");
+            let new_alloc = Kind::array::<T>(new_cap)
+                .unwrap_or_else(|| panic!("capacity overflow"));
             // FIXME: may crash and burn on over-reserve
-            alloc_guard(new_alloc_size);
+            alloc_guard(*new_alloc.size());
 
+            let ptr = self.ptr();
+            let alloc = &mut self.a;
             let ptr = if self.cap == 0 {
-                heap::allocate(new_alloc_size, align)
+                alloc.alloc(new_alloc)
             } else {
-                heap::reallocate(self.ptr() as *mut _,
-                                 self.cap * elem_size,
-                                 new_alloc_size,
-                                 align)
+                let old_alloc = Kind::array::<T>(self.cap).unwrap();
+                alloc.realloc(nonzero::NonZero::new(ptr as *mut _),
+                              old_alloc,
+                              new_alloc)
             };
 
-            // If allocate or reallocate fail, we'll get `null` back
-            if ptr.is_null() {
-                oom()
-            }
-
+            // If allocate or reallocate fail, we'll get `Err` back
+            let ptr = *ptr.unwrap_or_else(|_| alloc.oom());
             self.ptr = Unique::new(ptr as *mut _);
             self.cap = new_cap;
         }
@@ -431,7 +418,6 @@ impl<T, A> RawVec<T, A> where A: Allocator {
     /// Aborts on OOM.
     pub fn shrink_to_fit(&mut self, amount: usize) {
         let elem_size = mem::size_of::<T>();
-        let align = mem::align_of::<T>();
 
         // Set the `cap` because they might be about to promote to a `Box<[T]>`
         if elem_size == 0 {
@@ -449,13 +435,14 @@ impl<T, A> RawVec<T, A> where A: Allocator {
             unsafe {
                 // Overflow check is unnecessary as the vector is already at
                 // least this large.
-                let ptr = heap::reallocate(self.ptr() as *mut _,
-                                           self.cap * elem_size,
-                                           amount * elem_size,
-                                           align);
-                if ptr.is_null() {
-                    oom()
-                }
+                let old_kind = Kind::array::<T>(self.cap).unwrap();
+                let new_kind = Kind::array::<T>(amount).unwrap();
+                let ptr = self.ptr();
+                let alloc = &mut self.a;
+                let ptr = alloc.realloc(nonzero::NonZero::new(ptr as *mut _),
+                                        old_kind,
+                                        new_kind);
+                let ptr = *ptr.unwrap_or_else(|_| alloc.oom());
                 self.ptr = Unique::new(ptr as *mut _);
             }
             self.cap = amount;
