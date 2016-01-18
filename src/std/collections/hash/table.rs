@@ -9,6 +9,8 @@
 // except according to those terms.
 
 use alloc::heap::{allocate, deallocate, EMPTY};
+use core_alloc::Allocator;
+use core_alloc::heap::Allocator as HeapAllocator;
 
 use cmp;
 use hash::{Hash, Hasher};
@@ -61,7 +63,7 @@ const EMPTY_BUCKET: u64 = 0;
 /// invariants at the type level and employs some performance trickery,
 /// but in general is just a tricked out `Vec<Option<u64, K, V>>`.
 #[unsafe_no_drop_flag]
-pub struct RawTable<K, V> {
+pub struct RawTable<K, V, A=HeapAllocator> where A: Allocator {
     capacity: usize,
     size:     usize,
     hashes:   Unique<u64>,
@@ -69,6 +71,7 @@ pub struct RawTable<K, V> {
     // Because K/V do not appear directly in any of the types in the struct,
     // inform rustc that in fact instances of K and V are reachable from here.
     marker:   marker::PhantomData<(K,V)>,
+    alloc: A,
 }
 
 unsafe impl<K: Send, V: Send> Send for RawTable<K, V> {}
@@ -219,7 +222,7 @@ impl<K, V, M> Bucket<K, V, M> {
     }
 }
 
-impl<K, V, M: Deref<Target=RawTable<K, V>>> Bucket<K, V, M> {
+impl<K, V, A, M: Deref<Target=RawTable<K, V, A>>> Bucket<K, V, M> where A: Allocator {
     pub fn new(table: M, hash: SafeHash) -> Bucket<K, V, M> {
         Bucket::at_index(table, hash.inspect() as usize)
     }
@@ -291,7 +294,7 @@ impl<K, V, M: Deref<Target=RawTable<K, V>>> Bucket<K, V, M> {
     }
 }
 
-impl<K, V, M: Deref<Target=RawTable<K, V>>> EmptyBucket<K, V, M> {
+impl<K, V, A, M: Deref<Target=RawTable<K, V, A>>> EmptyBucket<K, V, M> where A: Allocator {
     #[inline]
     pub fn next(self) -> Bucket<K, V, M> {
         let mut bucket = self.into_bucket();
@@ -349,7 +352,7 @@ impl<K, V, M: Deref<Target=RawTable<K, V>> + DerefMut> EmptyBucket<K, V, M> {
     }
 }
 
-impl<K, V, M: Deref<Target=RawTable<K, V>>> FullBucket<K, V, M> {
+impl<K, V, A, M: Deref<Target=RawTable<K, V, A>>> FullBucket<K, V, M> where A: Allocator {
     #[inline]
     pub fn next(self) -> Bucket<K, V, M> {
         let mut bucket = self.into_bucket();
@@ -567,15 +570,24 @@ fn test_offset_calculation() {
 }
 
 impl<K, V> RawTable<K, V> {
+    /// Creates a new raw table from a given capacity. All buckets are
+    /// initially empty.
+    pub fn new(capacity: usize) -> RawTable<K, V> {
+        RawTable::new_in(capacity, HeapAllocator)
+    }
+}
+
+impl<K, V, A> RawTable<K, V, A> where A: Allocator {
     /// Does not initialize the buckets. The caller should ensure they,
     /// at the very least, set every hash to EMPTY_BUCKET.
-    unsafe fn new_uninitialized(capacity: usize) -> RawTable<K, V> {
+    unsafe fn new_uninitialized_in(capacity: usize, a: A) -> RawTable<K, V, A> {
         if capacity == 0 {
             return RawTable {
                 size: 0,
                 capacity: 0,
                 hashes: Unique::new(EMPTY as *mut u64),
                 marker: marker::PhantomData,
+                alloc: a,
             };
         }
 
@@ -618,6 +630,7 @@ impl<K, V> RawTable<K, V> {
             size:     0,
             hashes:   Unique::new(hashes),
             marker:   marker::PhantomData,
+            alloc: a,
         }
     }
 
@@ -641,11 +654,10 @@ impl<K, V> RawTable<K, V> {
         }
     }
 
-    /// Creates a new raw table from a given capacity. All buckets are
-    /// initially empty.
-    pub fn new(capacity: usize) -> RawTable<K, V> {
+    /// DOC TODO
+    pub fn new_in(capacity: usize, a: A) -> RawTable<K, V, A> {
         unsafe {
-            let ret = RawTable::new_uninitialized(capacity);
+            let ret = RawTable::new_uninitialized_in(capacity, a);
             ptr::write_bytes(*ret.hashes, 0, capacity);
             ret
         }
@@ -686,7 +698,7 @@ impl<K, V> RawTable<K, V> {
         }
     }
 
-    pub fn into_iter(self) -> IntoIter<K, V> {
+    pub fn into_iter(self) -> IntoIter<K, V, A> {
         let RawBuckets { raw, hashes_end, .. } = self.raw_buckets();
         // Replace the marker regardless of lifetime bounds on parameters.
         IntoIter {
@@ -699,7 +711,7 @@ impl<K, V> RawTable<K, V> {
         }
     }
 
-    pub fn drain(&mut self) -> Drain<K, V> {
+    pub fn drain(&mut self) -> Drain<K, V, A> {
         let RawBuckets { raw, hashes_end, .. } = self.raw_buckets();
         // Replace the marker regardless of lifetime bounds on parameters.
         Drain {
@@ -842,22 +854,22 @@ unsafe impl<'a, K: Sync, V: Sync> Sync for IterMut<'a, K, V> {}
 unsafe impl<'a, K: Send, V: Send> Send for IterMut<'a, K, V> {}
 
 /// Iterator over the entries in a table, consuming the table.
-pub struct IntoIter<K, V> {
-    table: RawTable<K, V>,
-    iter: RawBuckets<'static, K, V>
-}
-
-unsafe impl<K: Sync, V: Sync> Sync for IntoIter<K, V> {}
-unsafe impl<K: Send, V: Send> Send for IntoIter<K, V> {}
-
-/// Iterator over the entries in a table, clearing the table.
-pub struct Drain<'a, K: 'a, V: 'a> {
-    table: &'a mut RawTable<K, V>,
+pub struct IntoIter<K, V, A=HeapAllocator> where A: Allocator {
+    table: RawTable<K, V, A>,
     iter: RawBuckets<'static, K, V>,
 }
 
-unsafe impl<'a, K: Sync, V: Sync> Sync for Drain<'a, K, V> {}
-unsafe impl<'a, K: Send, V: Send> Send for Drain<'a, K, V> {}
+unsafe impl<K: Sync, V: Sync, A: Sync> Sync for IntoIter<K, V, A> where A: Allocator {}
+unsafe impl<K: Send, V: Send, A: Send> Send for IntoIter<K, V, A> where A: Allocator {}
+
+/// Iterator over the entries in a table, clearing the table.
+pub struct Drain<'a, K: 'a, V: 'a, A:'a=HeapAllocator> where A: Allocator {
+    table: &'a mut RawTable<K, V, A>,
+    iter: RawBuckets<'static, K, V>,
+}
+
+unsafe impl<'a, K: Sync, V: Sync, A: Sync> Sync for Drain<'a, K, V, A> where A: Allocator {}
+unsafe impl<'a, K: Send, V: Send, A: Send> Send for Drain<'a, K, V, A> where A: Allocator {}
 
 impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
@@ -901,7 +913,7 @@ impl<'a, K, V> ExactSizeIterator for IterMut<'a, K, V> {
     fn len(&self) -> usize { self.elems_left }
 }
 
-impl<K, V> Iterator for IntoIter<K, V> {
+impl<K, V, A> Iterator for IntoIter<K, V, A> where A: Allocator {
     type Item = (SafeHash, K, V);
 
     fn next(&mut self) -> Option<(SafeHash, K, V)> {
@@ -924,11 +936,11 @@ impl<K, V> Iterator for IntoIter<K, V> {
         (size, Some(size))
     }
 }
-impl<K, V> ExactSizeIterator for IntoIter<K, V> {
+impl<K, V, A> ExactSizeIterator for IntoIter<K, V, A> where A: Allocator {
     fn len(&self) -> usize { self.table.size() }
 }
 
-impl<'a, K, V> Iterator for Drain<'a, K, V> {
+impl<'a, K, V, A> Iterator for Drain<'a, K, V, A> where A: Allocator {
     type Item = (SafeHash, K, V);
 
     #[inline]
@@ -952,20 +964,21 @@ impl<'a, K, V> Iterator for Drain<'a, K, V> {
         (size, Some(size))
     }
 }
-impl<'a, K, V> ExactSizeIterator for Drain<'a, K, V> {
+impl<'a, K, V, A> ExactSizeIterator for Drain<'a, K, V, A> where A: Allocator {
     fn len(&self) -> usize { self.table.size() }
 }
 
-impl<'a, K: 'a, V: 'a> Drop for Drain<'a, K, V> {
+impl<'a, K: 'a, V: 'a, A: 'a> Drop for Drain<'a, K, V, A> where A: Allocator {
     fn drop(&mut self) {
         for _ in self {}
     }
 }
 
-impl<K: Clone, V: Clone> Clone for RawTable<K, V> {
-    fn clone(&self) -> RawTable<K, V> {
+impl<K: Clone, V: Clone, A: Clone> Clone for RawTable<K, V, A> where A: Allocator {
+    fn clone(&self) -> RawTable<K, V, A> {
         unsafe {
-            let mut new_ht = RawTable::new_uninitialized(self.capacity());
+            let mut new_ht = RawTable::new_uninitialized_in(self.capacity(),
+                                                            self.alloc.clone());
 
             {
                 let cap = self.capacity();
@@ -998,7 +1011,7 @@ impl<K: Clone, V: Clone> Clone for RawTable<K, V> {
     }
 }
 
-impl<K, V> Drop for RawTable<K, V> {
+impl<K, V, A> Drop for RawTable<K, V, A> where A: Allocator {
     #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
         if self.capacity == 0 || self.capacity == mem::POST_DROP_USIZE {
