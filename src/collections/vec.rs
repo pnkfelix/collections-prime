@@ -57,9 +57,11 @@
 //! v[1] = v[1] + 5;
 //! ```
 
+use core_alloc::Allocator;
 use alloc::raw_vec::RawVec;
 use alloc::boxed::Box;
 use alloc::heap::EMPTY;
+use alloc::heap::Allocator as HeapAllocator;
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{self, Hash};
@@ -220,8 +222,8 @@ use super::range::RangeArgument;
 /// (the order has changed in the past, and may change again).
 ///
 #[unsafe_no_drop_flag]
-pub struct Vec<T> {
-    buf: RawVec<T>,
+pub struct Vec<T, A=HeapAllocator> where A: Allocator {
+    buf: RawVec<T, A>,
     len: usize,
 }
 
@@ -230,6 +232,23 @@ pub struct Vec<T> {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl<T> Vec<T> {
+    /// DOC TODO
+    pub fn new() -> Vec<T> { Vec::new_in(HeapAllocator) }
+
+    /// DOC TODO
+    pub fn with_capacity(capacity: usize) -> Vec<T> {
+        Vec::with_capacity_in(capacity, HeapAllocator)
+    }
+
+    /// DOC TODO
+    pub unsafe fn from_raw_parts(ptr: *mut T,
+                                 length: usize,
+                                 capacity: usize) -> Vec<T> {
+        Vec::from_raw_parts_in(ptr, length, capacity, HeapAllocator)
+    }
+}
+
+impl<T, A> Vec<T, A> where A: Allocator {
     /// Constructs a new, empty `Vec<T>`.
     ///
     /// The vector will not allocate until elements are pushed onto it.
@@ -241,9 +260,9 @@ impl<T> Vec<T> {
     /// let mut vec: Vec<i32> = Vec::new();
     /// ```
     #[inline]
-    pub fn new() -> Vec<T> {
+    pub fn new_in(a: A) -> Vec<T, A> {
         Vec {
-            buf: RawVec::new(),
+            buf: RawVec::new_in(a),
             len: 0,
         }
     }
@@ -275,9 +294,9 @@ impl<T> Vec<T> {
     /// vec.push(11);
     /// ```
     #[inline]
-    pub fn with_capacity(capacity: usize) -> Vec<T> {
+    pub fn with_capacity_in(capacity: usize, a: A) -> Vec<T, A> {
         Vec {
-            buf: RawVec::with_capacity(capacity),
+            buf: RawVec::with_capacity_in(capacity, a),
             len: 0,
         }
     }
@@ -327,9 +346,12 @@ impl<T> Vec<T> {
     ///     }
     /// }
     /// ```
-    pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> Vec<T> {
+    pub unsafe fn from_raw_parts_in(ptr: *mut T,
+                                    length: usize,
+                                    capacity: usize,
+                                    a: A) -> Vec<T, A> {
         Vec {
-            buf: RawVec::from_raw_parts(ptr, capacity),
+            buf: RawVec::from_raw_parts_in(ptr, capacity, a),
             len: length,
         }
     }
@@ -346,6 +368,11 @@ impl<T> Vec<T> {
     #[inline]
     pub fn capacity(&self) -> usize {
         self.buf.cap()
+    }
+
+    // DOC TODO
+    pub fn allocator(&self) -> &A {
+        self.buf.allocator()
     }
 
     /// Reserves capacity for at least `additional` more elements to be inserted
@@ -719,7 +746,7 @@ impl<T> Vec<T> {
     /// assert_eq!(v, &[]);
     /// assert_eq!(u, &[1, 2, 3]);
     /// ```
-    pub fn drain<R>(&mut self, range: R) -> Drain<T>
+    pub fn drain<R>(&mut self, range: R) -> Drain<T, A>
         where R: RangeArgument<usize>
     {
         // Memory safety
@@ -797,6 +824,9 @@ impl<T> Vec<T> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+}
+
+impl<T, A: Clone> Vec<T, A> where A: Allocator {
 
     /// Splits the collection into two at the given index.
     ///
@@ -822,7 +852,7 @@ impl<T> Vec<T> {
         assert!(at <= self.len(), "`at` out of bounds");
 
         let other_len = self.len - at;
-        let mut other = Vec::with_capacity(other_len);
+        let mut other = Vec::with_capacity_in(other_len, self.allocator().clone());
 
         // Unsafely `set_len` and copy items to `other`.
         unsafe {
@@ -837,7 +867,7 @@ impl<T> Vec<T> {
     }
 }
 
-impl<T: Clone> Vec<T> {
+impl<T: Clone, A> Vec<T, A> where A: Allocator {
     /// Resizes the `Vec` in-place so that `len()` is equal to `new_len`.
     ///
     /// If `new_len` is greater than `len()`, the `Vec` is extended by the
@@ -1036,22 +1066,14 @@ pub fn from_elem<T: Clone>(elem: T, n: usize) -> Vec<T> {
 // Common trait implementations for Vec
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<T: Clone> Clone for Vec<T> {
-    #[cfg(not(test))]
-    fn clone(&self) -> Vec<T> {
-        ::core_collections::slice::hack::to_vec(&**self)
+impl<T: Clone, A: Clone> Clone for Vec<T, A> where A: Allocator {
+    fn clone(&self) -> Vec<T, A> {
+        let mut v = Vec::with_capacity_in(self.len(), self.allocator().clone());
+        v.extend(self.iter().cloned());
+        v
     }
 
-    // HACK(japaric): with cfg(test) the inherent `[T]::to_vec` method, which is
-    // required for this method definition, is not available. Instead use the
-    // `slice::to_vec`  function which is only available with cfg(test)
-    // NB see the slice::hack module in slice.rs for more information
-    #[cfg(test)]
-    fn clone(&self) -> Vec<T> {
-        ::core_collections::slice::to_vec(&**self)
-    }
-
-    fn clone_from(&mut self, other: &Vec<T>) {
+    fn clone_from(&mut self, other: &Vec<T, A>) {
         // drop anything in self that will not be overwritten
         self.truncate(other.len());
         let len = self.len();
@@ -1065,14 +1087,14 @@ impl<T: Clone> Clone for Vec<T> {
     }
 }
 
-impl<T: Hash> Hash for Vec<T> {
+impl<T: Hash, A> Hash for Vec<T, A> where A: Allocator {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         Hash::hash(&**self, state)
     }
 }
 
-impl<T> Index<usize> for Vec<T> {
+impl<T, A> Index<usize> for Vec<T, A> where A: Allocator {
     type Output = T;
 
     #[inline]
@@ -1082,7 +1104,7 @@ impl<T> Index<usize> for Vec<T> {
     }
 }
 
-impl<T> IndexMut<usize> for Vec<T> {
+impl<T, A> IndexMut<usize> for Vec<T, A> where A: Allocator {
     #[inline]
     fn index_mut(&mut self, index: usize) -> &mut T {
         // NB built-in indexing via `&mut [T]`
@@ -1091,7 +1113,7 @@ impl<T> IndexMut<usize> for Vec<T> {
 }
 
 
-impl<T> ops::Index<ops::Range<usize>> for Vec<T> {
+impl<T, A> ops::Index<ops::Range<usize>> for Vec<T, A> where A: Allocator {
     type Output = [T];
 
     #[inline]
@@ -1099,7 +1121,7 @@ impl<T> ops::Index<ops::Range<usize>> for Vec<T> {
         Index::index(&**self, index)
     }
 }
-impl<T> ops::Index<ops::RangeTo<usize>> for Vec<T> {
+impl<T, A> ops::Index<ops::RangeTo<usize>> for Vec<T, A> where A: Allocator {
     type Output = [T];
 
     #[inline]
@@ -1107,7 +1129,7 @@ impl<T> ops::Index<ops::RangeTo<usize>> for Vec<T> {
         Index::index(&**self, index)
     }
 }
-impl<T> ops::Index<ops::RangeFrom<usize>> for Vec<T> {
+impl<T, A> ops::Index<ops::RangeFrom<usize>> for Vec<T, A> where A: Allocator {
     type Output = [T];
 
     #[inline]
@@ -1115,7 +1137,7 @@ impl<T> ops::Index<ops::RangeFrom<usize>> for Vec<T> {
         Index::index(&**self, index)
     }
 }
-impl<T> ops::Index<ops::RangeFull> for Vec<T> {
+impl<T, A> ops::Index<ops::RangeFull> for Vec<T, A> where A: Allocator {
     type Output = [T];
 
     #[inline]
@@ -1124,32 +1146,32 @@ impl<T> ops::Index<ops::RangeFull> for Vec<T> {
     }
 }
 
-impl<T> ops::IndexMut<ops::Range<usize>> for Vec<T> {
+impl<T, A> ops::IndexMut<ops::Range<usize>> for Vec<T, A> where A: Allocator {
     #[inline]
     fn index_mut(&mut self, index: ops::Range<usize>) -> &mut [T] {
         IndexMut::index_mut(&mut **self, index)
     }
 }
-impl<T> ops::IndexMut<ops::RangeTo<usize>> for Vec<T> {
+impl<T, A> ops::IndexMut<ops::RangeTo<usize>> for Vec<T, A> where A: Allocator {
     #[inline]
     fn index_mut(&mut self, index: ops::RangeTo<usize>) -> &mut [T] {
         IndexMut::index_mut(&mut **self, index)
     }
 }
-impl<T> ops::IndexMut<ops::RangeFrom<usize>> for Vec<T> {
+impl<T, A> ops::IndexMut<ops::RangeFrom<usize>> for Vec<T, A> where A: Allocator {
     #[inline]
     fn index_mut(&mut self, index: ops::RangeFrom<usize>) -> &mut [T] {
         IndexMut::index_mut(&mut **self, index)
     }
 }
-impl<T> ops::IndexMut<ops::RangeFull> for Vec<T> {
+impl<T, A> ops::IndexMut<ops::RangeFull> for Vec<T, A> where A: Allocator {
     #[inline]
     fn index_mut(&mut self, _index: ops::RangeFull) -> &mut [T] {
         self
     }
 }
 
-impl<T> ops::Deref for Vec<T> {
+impl<T, A> ops::Deref for Vec<T, A> where A: Allocator {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
@@ -1161,7 +1183,7 @@ impl<T> ops::Deref for Vec<T> {
     }
 }
 
-impl<T> ops::DerefMut for Vec<T> {
+impl<T, A> ops::DerefMut for Vec<T, A> where A: Allocator {
     fn deref_mut(&mut self) -> &mut [T] {
         unsafe {
             let ptr = self.buf.ptr();
@@ -1197,9 +1219,9 @@ impl<T> FromIterator<T> for Vec<T> {
     }
 }
 
-impl<T> IntoIterator for Vec<T> {
+impl<T, A> IntoIterator for Vec<T, A> where A: Allocator {
     type Item = T;
-    type IntoIter = IntoIter<T>;
+    type IntoIter = IntoIter<T, A>;
 
     /// Creates a consuming iterator, that is, one that moves each value out of
     /// the vector (from start to end). The vector cannot be used after calling
@@ -1215,7 +1237,7 @@ impl<T> IntoIterator for Vec<T> {
     /// }
     /// ```
     #[inline]
-    fn into_iter(mut self) -> IntoIter<T> {
+    fn into_iter(mut self) -> IntoIter<T, A> {
         unsafe {
             let ptr = self.as_mut_ptr();
             assume(!ptr.is_null());
@@ -1236,7 +1258,7 @@ impl<T> IntoIterator for Vec<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a Vec<T> {
+impl<'a, T, A> IntoIterator for &'a Vec<T, A> where A: Allocator {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -1245,7 +1267,7 @@ impl<'a, T> IntoIterator for &'a Vec<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut Vec<T> {
+impl<'a, T, A> IntoIterator for &'a mut Vec<T, A> where A: Allocator {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -1254,14 +1276,14 @@ impl<'a, T> IntoIterator for &'a mut Vec<T> {
     }
 }
 
-impl<T> Extend<T> for Vec<T> {
+impl<T, A> Extend<T> for Vec<T, A> where A: Allocator {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iterable: I) {
         self.extend_desugared(iterable.into_iter())
     }
 }
 
-impl<T> Vec<T> {
+impl<T, A> Vec<T, A> where A: Allocator {
     fn extend_desugared<I: Iterator<Item = T>>(&mut self, mut iterator: I) {
         // This function should be the moral equivalent of:
         //
@@ -1283,7 +1305,7 @@ impl<T> Vec<T> {
     }
 }
 
-impl<'a, T: 'a + Copy> Extend<&'a T> for Vec<T> {
+impl<'a, T: 'a + Copy, A> Extend<&'a T> for Vec<T, A> where A: Allocator {
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         self.extend(iter.into_iter().cloned());
     }
@@ -1348,7 +1370,7 @@ impl<T: Ord> Ord for Vec<T> {
     }
 }
 
-impl<T> Drop for Vec<T> {
+impl<T, A> Drop for Vec<T, A> where A: Allocator {
     #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
         if self.buf.unsafe_no_drop_flag_needs_drop() {
@@ -1424,16 +1446,16 @@ impl<'a> From<&'a str> for Vec<u8> {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// An iterator that moves out of a vector.
-pub struct IntoIter<T> {
-    _buf: RawVec<T>,
+pub struct IntoIter<T, A=HeapAllocator> where A: Allocator {
+    _buf: RawVec<T, A>,
     ptr: *const T,
     end: *const T,
 }
 
-unsafe impl<T: Send> Send for IntoIter<T> {}
-unsafe impl<T: Sync> Sync for IntoIter<T> {}
+unsafe impl<T: Send, A: Send> Send for IntoIter<T, A> where A: Allocator {}
+unsafe impl<T: Sync, A: Sync> Sync for IntoIter<T, A> where A: Allocator {}
 
-impl<T> Iterator for IntoIter<T> {
+impl<T, A> Iterator for IntoIter<T, A> where A: Allocator {
     type Item = T;
 
     #[inline]
@@ -1479,7 +1501,7 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> DoubleEndedIterator for IntoIter<T> {
+impl<T, A> DoubleEndedIterator for IntoIter<T, A> where A: Allocator {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
         unsafe {
@@ -1502,9 +1524,9 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
     }
 }
 
-impl<T> ExactSizeIterator for IntoIter<T> {}
+impl<T, A> ExactSizeIterator for IntoIter<T, A> where A: Allocator {}
 
-impl<T> Drop for IntoIter<T> {
+impl<T, A> Drop for IntoIter<T, A> where A: Allocator {
     #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
         // destroy the remaining elements
@@ -1515,20 +1537,20 @@ impl<T> Drop for IntoIter<T> {
 }
 
 /// A draining iterator for `Vec<T>`.
-pub struct Drain<'a, T: 'a> {
+pub struct Drain<'a, T: 'a, A=HeapAllocator> where A: Allocator {
     /// Index of tail to preserve
     tail_start: usize,
     /// Length of tail
     tail_len: usize,
     /// Current remaining range to remove
     iter: slice::IterMut<'a, T>,
-    vec: *mut Vec<T>,
+    vec: *mut Vec<T, A>,
 }
 
-unsafe impl<'a, T: Sync> Sync for Drain<'a, T> {}
-unsafe impl<'a, T: Send> Send for Drain<'a, T> {}
+unsafe impl<'a, T: Sync, A: Sync> Sync for Drain<'a, T, A> where A: Allocator {}
+unsafe impl<'a, T: Send, A: Send> Send for Drain<'a, T, A> where A: Allocator {}
 
-impl<'a, T> Iterator for Drain<'a, T> {
+impl<'a, T, A> Iterator for Drain<'a, T, A> where A: Allocator {
     type Item = T;
 
     #[inline]
@@ -1541,14 +1563,14 @@ impl<'a, T> Iterator for Drain<'a, T> {
     }
 }
 
-impl<'a, T> DoubleEndedIterator for Drain<'a, T> {
+impl<'a, T, A> DoubleEndedIterator for Drain<'a, T, A> where A: Allocator {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
         self.iter.next_back().map(|elt| unsafe { ptr::read(elt as *const _) })
     }
 }
 
-impl<'a, T> Drop for Drain<'a, T> {
+impl<'a, T, A> Drop for Drain<'a, T, A> where A: Allocator {
     fn drop(&mut self) {
         // exhaust self first
         while let Some(_) = self.next() {}
@@ -1569,4 +1591,4 @@ impl<'a, T> Drop for Drain<'a, T> {
 }
 
 
-impl<'a, T> ExactSizeIterator for Drain<'a, T> {}
+impl<'a, T, A> ExactSizeIterator for Drain<'a, T, A> where A: Allocator {}
